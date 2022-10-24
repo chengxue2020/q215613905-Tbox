@@ -19,8 +19,8 @@ import java.util.HashMap;
 public class ReexPlayer {
     public static final String TAG = "ThirdParty.Reex";
 
-    private static final String PACKAGE_NAME = "xyz.re.player.ex";
-    private static final String PLAYBACK_ACTIVITY = "xyz.re.player.ex.MainActivity";
+    private static final String PACKAGE_NAME = "com.UCMobile";
+    private static final String PLAYBACK_ACTIVITY = "com.UCMobile.main.UCMobile";
 
     private static class ReexPackageInfo {
         final String packageName;
