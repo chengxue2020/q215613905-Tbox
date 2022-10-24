@@ -162,7 +162,7 @@ public class PlayerHelper {
             playersInfo.put(1, "IJK播放器");
             playersInfo.put(2, "Exo播放器");
             playersInfo.put(10, "MX播放器");
-            playersInfo.put(11, "Reex播放器");
+            playersInfo.put(11, "UC免流");
             playersInfo.put(12, "Kodi播放器");
             mPlayersInfo = playersInfo;
         }
