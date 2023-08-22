@@ -1,6 +1,6 @@
 <resources>
     <!--  app名称   -->
-    <string name="app_name">TVBox_3.0</string>
+    <string name="app_name">朋影视</string>
 	<string name="mn_Version">20230822.1119</string>
 	<string name="dia_about">版本：20230822.1119\n\n更新日志：\nmerge by watson\nmerge By zhixc\n添加删除记录确认对话框\n修复部分在线字幕加载闪退的bug\n修复历史记录页面删除记录速度过快出现的索引越界异常\n修复ed2k 和 magnet 磁力链接剧集反复切换可能会引起 playUrl 为null的异常\n\n本软件只提供聚合展示功能，所有资源来自网上, 软件不参与任何制作, 上传, 储存, 下载等内容. 软件仅供学习参考, 请于安装后24小时内删除。\n\n打包分发请保留出处\nhttps://github.com/CatVodTVOfficial/TVBoxOSC</string>
 </resources>
