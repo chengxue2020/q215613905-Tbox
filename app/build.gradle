@@ -74,6 +74,7 @@ dependencies {
     implementation 'androidx.recyclerview:recyclerview:1.2.1'
     implementation files('libs\\thunder.jar', 'libs\\pyramid.aar')
     implementation files('libs/commons-lang3-3.12.0.jar')
+    implementation files('libs/xwalk_shared_library-23.53.589.4.aar')
     implementation 'org.conscrypt:conscrypt-android:2.5.2'
     implementation 'com.squareup.okhttp3:okhttp:3.12.11'
     annotationProcessor 'androidx.room:room-compiler:2.3.0'
@@ -95,9 +96,9 @@ dependencies {
     //implementation project(":quickjs")
 
     implementation 'net.sourceforge.streamsupport:android-retrofuture:1.7.4'
-    implementation('org.xwalk:xwalk_shared_library:23.53.589.4') {
-        exclude group: 'com.android.support'
-    }
+//    implementation('org.xwalk:xwalk_shared_library:23.53.589.4') {
+//        exclude group: 'com.android.support'
+//    }
     implementation 'com.lzy.net:okgo:3.0.4'
     // implementation 'com.tencent.bugly:crashreport_upgrade:latest.release'
     implementation 'com.owen:tv-recyclerview:3.0.0'
