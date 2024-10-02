@@ -40,7 +40,9 @@ public final class IjkTimedText {
         mTextChars = text;
     }
 
-    public IjkTimedText(int[] obj) {
+
+    public IjkTimedText(int[] bitmap) {
+        this.mBitmapData = bitmap;
     }
 
     public Rect getBounds() {

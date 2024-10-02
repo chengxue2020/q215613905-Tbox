@@ -3,11 +3,17 @@ plugins {
 }
 
 android {
+//    ndkPath = "D:\\Android\\NDK\\android-ndk-r23b\\"
     compileSdkVersion 30
 
     defaultConfig {
         minSdkVersion 16
         targetSdkVersion 26
+        externalNativeBuild {
+            cmake {
+                abiFilters 'armeabi-v7a'
+            }
+        }
     }
 
     buildTypes {
@@ -21,23 +27,20 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
 
-        releaseSimon.initWith(release)
-        releaseSimon {
+        debug {
         }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
+    externalNativeBuild {
+        /*cmake {
+            path file('src/main/cpp/CMakeLists.txt')
+            version "3.10.2"
+        }*/
+    }
 }
 
 dependencies {
-    implementation "androidx.annotation:annotation:1.3.0"
-    api "com.google.android.exoplayer:exoplayer-core:2.14.2"
-    api "com.google.android.exoplayer:exoplayer-dash:2.14.2"
-    api "com.google.android.exoplayer:exoplayer-hls:2.14.2"
-    api "com.google.android.exoplayer:exoplayer-rtsp:2.14.2"
-    api "com.google.android.exoplayer:extension-rtmp:2.14.2"
-    api "com.google.android.exoplayer:extension-okhttp:2.14.2"
-    api 'xyz.doikki.android.dkplayer:dkplayer-ui:3.3.5'
 }

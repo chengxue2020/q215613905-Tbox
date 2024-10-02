@@ -50,9 +50,7 @@ public class IjkMediaPlayer extends IjkPlayer {
         }
 
         // 在每个数据包之后启用 I/O 上下文的刷新
-        mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT, "flush_packets", 1);
-        // 当 CPU 处理不过来的时候的丢帧帧数，默认为 0，参数范围是 [-1, 120]
-        mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 5);
+//        mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT, "flush_packets", 1);
         // 设置视频流格式
         mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_PLAYER, "overlay-format", tv.danmaku.ijk.media.player.IjkMediaPlayer.SDL_FCC_RV32);
 
@@ -132,12 +130,13 @@ public class IjkMediaPlayer extends IjkPlayer {
         int index = 0;
         for (IjkTrackInfo info : trackInfo) {
             if (info.getTrackType() == ITrackInfo.MEDIA_TRACK_TYPE_AUDIO) {//音轨信息
-                TrackInfoBean t = new TrackInfoBean();
-                t.name = info.getInfoInline();
-                t.language = info.getLanguage();
-                t.index = index;
-                t.selected = index == audioSelected;
-                data.addAudio(t);
+                TrackInfoBean a = new TrackInfoBean();
+                a.name = info.getInfoInline();
+                a.language = info.getLanguage();
+                a.index = index;
+                a.selected = index == audioSelected;
+                // 如果需要，还可以检查轨道的描述或标题以获取更多信息
+                data.addAudio(a);
             }
             if (info.getTrackType() == ITrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT) {//内置字幕
                 TrackInfoBean t = new TrackInfoBean();

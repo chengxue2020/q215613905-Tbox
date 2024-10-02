@@ -49,7 +49,7 @@ public class GridAdapter extends BaseQuickAdapter<Movie.Video, BaseViewHolder> {
                                 .roundRadius(AutoSizeUtils.mm2px(mContext, 10), RoundTransformation.RoundType.ALL))
                         .placeholder(R.drawable.img_loading_placeholder)
                         .noFade()
-//                        .error(R.drawable.img_loading_placeholder)
+                        .error(R.drawable.img_loading_placeholder)
                         .into(ivThumb);
             } else {
                 ivThumb.setImageResource(R.drawable.img_loading_placeholder);
@@ -100,7 +100,7 @@ public class GridAdapter extends BaseQuickAdapter<Movie.Video, BaseViewHolder> {
                             .roundRadius(AutoSizeUtils.mm2px(mContext, 10), RoundTransformation.RoundType.ALL))
                     .placeholder(R.drawable.img_loading_placeholder)
                     .noFade()
-//                    .error(R.drawable.img_loading_placeholder)
+                    .error(R.drawable.img_loading_placeholder)
                     .into(ivThumb);
         } else {
             ivThumb.setImageResource(R.drawable.img_loading_placeholder);
