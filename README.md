@@ -29,12 +29,14 @@ https://github.com/chengxue2020/q215613905-Tbox/blob/main/app/build.gradle
 3、修改图标、背景、载入动画
 背景
 https://github.com/chengxue2020/q215613905-Tbox/tree/main/app/src/main/res/drawable/app_bg.png
+
 图标
 https://github.com/chengxue2020/q215613905-Tbox/tree/main/app/src/main/res/drawable/app_banner.png
 https://github.com/chengxue2020/q215613905-Tbox/tree/main/app/src/main/res/drawable-xxxhdpi/app_icon.png
 https://github.com/chengxue2020/q215613905-Tbox/tree/main/app/src/main/res/drawable-xxhdpi/app_icon.png
 https://github.com/chengxue2020/q215613905-Tbox/tree/main/app/src/main/res/drawable-xhdpi/app_icon.png
 https://github.com/chengxue2020/q215613905-Tbox/tree/main/app/src/main/res/drawable-hdpi/app_icon.png
+
 载入动画
 https://github.com/chengxue2020/q215613905-Tbox/tree/main/app/src/main/res/drawable/icon_loading.png
 
