@@ -2,7 +2,7 @@
 
 [![AutoBuildTest](https://github.com/chengxue2020/q215613905-Tbox/actions/workflows/auto_build_with_remark.yml/badge.svg)](https://github.com/chengxue2020/q215613905-Tbox/actions/workflows/auto_build_with_remark.yml)
 [![Download](https://img.shields.io/github/v/release/chengxue2020/q215613905-Tbox?color=green&logoColor=green&label=Download&logo=DocuSign)](https://github.com/chengxue2020/q215613905-Tbox/releases)
-[![Total](https://shields.io/github/downloads/o0HalfLife0o/TVBoxOSC/total?logo=Bookmeter&label=Counts&logoColor=yellow&color=yellow)](https://github.com/o0HalfLife0o/TVBoxOSC/releases
+[![Total](https://shields.io/github/downloads/chengxue2020/q215613905-Tbox/total?logo=Bookmeter&label=Counts&logoColor=yellow&color=yellow)](https://github.com/o0HalfLife0o/TVBoxOSC/releases
 
 ## Credits
 This repo relies on the following third-party projects:
