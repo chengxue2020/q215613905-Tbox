@@ -1,14 +1,18 @@
 apply plugin: 'com.android.application'
 
+def static buildTime() {
+    return new Date().format("yy'.'MM'.'dd'.'HH'.'mm", TimeZone.getTimeZone("GMT+08:00"))
+}
+
 android {
-    compileSdkVersion 30
+    compileSdkVersion 33
 
     defaultConfig {
-        applicationId 'com.github.tvbox.osc'
-        minSdkVersion 16
+        applicationId 'com.github.tvbox.osc.Frank'
+        minSdkVersion 18
         targetSdkVersion 26
         versionCode 1
-        versionName '1.0.0'
+        versionName buildTime() //根据打包日期生成版本号
         multiDexEnabled true
         //设置room的Schema的位置
         javaCompileOptions {
@@ -64,7 +68,7 @@ repositories {
     }
 }
 dependencies {
-    api fileTree(dir: "libs", include: ["*.jar"])
+    api fileTree(dir: "libs", include: ['*.jar', '*.aar'])
 
 
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
@@ -73,10 +77,10 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
     implementation 'androidx.lifecycle:lifecycle-extensions:2.2.0'
     implementation 'androidx.recyclerview:recyclerview:1.2.1'
-    implementation files('libs/thunder.jar')
+    implementation files('libs\\thunder.jar', 'libs\\pyramid.aar')
     implementation files('libs/commons-lang3-3.12.0.jar')
 
-
+    implementation 'org.conscrypt:conscrypt-android:2.5.2'
     implementation 'com.squareup.okhttp3:okhttp:3.12.11'
     annotationProcessor 'androidx.room:room-compiler:2.3.0'
     implementation 'androidx.room:room-runtime:2.3.0'
@@ -94,8 +98,9 @@ dependencies {
     implementation 'com.orhanobut:hawk:2.0.1'
 
     implementation project(":player")
-    implementation project(":quickjs")
+//    implementation project(":quickjs")
 
+implementation 'net.sourceforge.streamsupport:android-retrofuture:1.7.4'
 //    implementation('org.xwalk:xwalk_shared_library:23.53.589.4') {
 //        exclude group: 'com.android.support'
 //    }
@@ -104,7 +109,7 @@ dependencies {
     implementation 'com.owen:tv-recyclerview:3.0.0'
 
     implementation 'com.github.getActivity:XXPermissions:13.6'
-    implementation 'org.jsoup:jsoup:1.14.1'
+    implementation 'org.jsoup:jsoup:1.16.2'
     implementation 'com.github.hedzr:android-file-chooser:v1.2.0-final'
     implementation 'commons-io:commons-io:2.11.0'
     implementation 'com.googlecode.juniversalchardet:juniversalchardet:1.0.3'
