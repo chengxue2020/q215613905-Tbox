@@ -1,6 +1,6 @@
 <resources>
     <!--  app名称   -->
     <string name="app_name">TVBox_3.0</string>
-	<string name="mn_Version">2024.0925.0957</string>
-	<string name="dia_about">版本：2024.0925.0957\n\n更新日志：\n补充提交\n修正\n代码回退\nupdate quickjs.\n\n本软件只提供聚合展示功能，所有资源来自网上, 软件不参与任何制作, 上传, 储存, 下载等内容. 软件仅供学习参考, 请于安装后24小时内删除。\n\n打包分发请保留出处\nhttps://github.com/CatVodTVOfficial/TVBoxOSC</string>
+	<string name="mn_Version">2024.1029.0923</string>
+	<string name="dia_about">版本：2024.1029.0923\n\n更新日志：\n支持cronet\n本地代理支持转发header.\n\n本软件只提供聚合展示功能，所有资源来自网上, 软件不参与任何制作, 上传, 储存, 下载等内容. 软件仅供学习参考, 请于安装后24小时内删除。\n\n打包分发请保留出处\nhttps://github.com/CatVodTVOfficial/TVBoxOSC</string>
 </resources>
