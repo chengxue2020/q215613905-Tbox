@@ -10,7 +10,7 @@ android {
     defaultConfig {
         applicationId 'com.github.tvbox.osc.Frank'
         minSdkVersion 18
-        targetSdkVersion 26
+        targetSdkVersion 28
         versionCode 1
         versionName buildTime() //根据打包日期生成版本号
         multiDexEnabled true

@@ -20,6 +20,7 @@ import com.squareup.picasso.Picasso;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -61,7 +62,8 @@ public class OkGoHelper {
         } catch (Throwable th) {
             th.printStackTrace();
         }
-        builder.dns(dnsOverHttps);
+//        builder.dns(dnsOverHttps);
+        builder.dns(new CustomDns());
 
         ExoMediaSourceHelper.getInstance(App.getInstance()).setOkClient(builder.build());
     }
@@ -94,6 +96,10 @@ public class OkGoHelper {
             }
             case 6: {
                 return "https://dns.quad9.net/dns-query";
+}
+            }
+            case 7: {
+                return "https://1.1.1.1/dns-query";   // takagen99
             }
         }
         return "";
@@ -107,6 +113,8 @@ public class OkGoHelper {
         dnsHttpsList.add("谷歌");
         dnsHttpsList.add("AdGuard");
         dnsHttpsList.add("Quad9");
+        dnsHttpsList.add("谷歌");
+        dnsHttpsList.add("CloudFlare");
         OkHttpClient.Builder builder = new OkHttpClient.Builder();
         HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor("OkExoPlayer");
         if (Hawk.get(HawkConfig.DEBUG_OPEN, false)) {
