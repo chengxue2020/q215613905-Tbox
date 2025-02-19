@@ -140,6 +140,7 @@ public class PlayFragment extends BaseLazyFragment {
         initView();
         initViewModel();
         initData();
+        Hawk.put(HawkConfig.PLAYER_IS_LIVE,false);
     }
 
     public long getSavedProgress(String url) {

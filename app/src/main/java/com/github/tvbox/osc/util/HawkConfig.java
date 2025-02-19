@@ -17,6 +17,7 @@ public class HawkConfig {
     public static final String PARSE_WEBVIEW = "parse_webview"; // true 系统 false xwalk
     public static final String IJK_CODEC = "ijk_codec";
     public static final String PLAY_TYPE = "play_type";//0 系统 1 ijk 2 exo 10 MXPlayer
+    public static final String LIVE_PLAY_TYPE = "live_play_type";//0 系统 1 ijk 2 exo 10 MXPlayer
     public static final String PLAY_RENDER = "play_render"; //0 texture 2
     public static final String PLAY_SCALE = "play_scale"; //0 texture 2
     public static final String PLAY_TIME_STEP = "play_time_step"; //0 texture 2
@@ -38,5 +39,6 @@ public class HawkConfig {
     public static final String NOW_DATE = "now_date"; //当前日期
     public static final String REMOTE_TVBOX = "remote_tvbox_host";
     public static final String IJK_CACHE_PLAY = "ijk_cache_play";
+    public static final String PLAYER_IS_LIVE = "player_is_live";
     public static boolean hotVodDelete;
 }

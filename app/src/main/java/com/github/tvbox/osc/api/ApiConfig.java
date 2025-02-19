@@ -20,6 +20,7 @@ import com.github.tvbox.osc.util.AES;
 import com.github.tvbox.osc.util.AdBlocker;
 import com.github.tvbox.osc.util.DefaultConfig;
 import com.github.tvbox.osc.util.HawkConfig;
+import com.github.tvbox.osc.util.LOG;
 import com.github.tvbox.osc.util.MD5;
 import com.github.tvbox.osc.util.LOG;
 import com.github.tvbox.osc.util.VideoParseRuler;
@@ -61,6 +62,7 @@ public class ApiConfig {
     private List<LiveChannelGroup> liveChannelGroupList;
     private List<ParseBean> parseBeanList;
     private List<String> vipParseFlags;
+    private Map<String,String> myHosts;
     private List<IJKCode> ijkCodes;
     private String spider = null;
     public String wallpaper = "";
@@ -412,6 +414,11 @@ public class ApiConfig {
                     String epg =livesOBJ.get("epg").getAsString();
                     Hawk.put(HawkConfig.EPG_URL,epg);
                 }
+                //直播播放器类型
+                if(livesOBJ.has("playerType")){
+                    String livePlayType =livesOBJ.get("playerType").getAsString();
+                    Hawk.put(HawkConfig.LIVE_PLAY_TYPE,livePlayType);
+                }
 
                 LiveChannelGroup liveChannelGroup = new LiveChannelGroup();
                 liveChannelGroup.setGroupName(url);
@@ -428,6 +435,11 @@ public class ApiConfig {
                         if(fengMiLives.has("epg")){
                             String epg =fengMiLives.get("epg").getAsString();
                             Hawk.put(HawkConfig.EPG_URL,epg);
+                        }
+                        //直播播放器类型
+                        if(livesOBJ.has("playerType")){
+                            String livePlayType =livesOBJ.get("playerType").getAsString();
+                            Hawk.put(HawkConfig.LIVE_PLAY_TYPE,livePlayType);
                         }
 
                         if(url.startsWith("http")){
@@ -485,6 +497,17 @@ public class ApiConfig {
                         String host = one.getAsString();
                         VideoParseRuler.addHostRule(host, rule);
                     }
+                }
+            }
+        }
+        myHosts = new HashMap<>();
+        if (infoJson.has("hosts")) {
+            JsonArray hostsArray = infoJson.getAsJsonArray("hosts");
+            for (int i = 0; i < hostsArray.size(); i++) {
+                String entry = hostsArray.get(i).getAsString();
+                String[] parts = entry.split("=", 2); // 只分割一次，防止 value 里有 =
+                if (parts.length == 2) {
+                    myHosts.put(parts[0], parts[1]);
                 }
             }
         }
@@ -733,5 +756,9 @@ public class ApiConfig {
             content = content.replace("./", url.substring(0,url.lastIndexOf("/") + 1));
         }
         return content;
+    }
+
+    public Map<String,String> getMyHost() {
+        return myHosts;
     }
 }
