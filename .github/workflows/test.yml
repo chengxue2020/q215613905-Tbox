@@ -23,7 +23,7 @@ jobs:
         include:
           - userName: chengxue2020
             repoName: q215613905-Tbox
-            branchName: test
+            branchName: Main
             java_ver: 17
     steps:
       - name: Checkout
