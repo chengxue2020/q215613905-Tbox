@@ -214,3 +214,9 @@
 # Cronet支持http3
 -keep class com.google.net.cronet.**{*;}
 -keep class org.chromium.net.**{*;}
+
+# 添加 python 支持
+-keep public class com.undcover.freedom.pyramid.** { *; }
+-dontwarn com.undcover.freedom.pyramid.**
+-keep public class com.chaquo.python.** { *; }
+-dontwarn com.chaquo.python.**
