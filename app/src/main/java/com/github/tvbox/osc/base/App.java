@@ -23,6 +23,8 @@ import com.p2p.P2PClass;
 import me.jessyan.autosize.AutoSizeConfig;
 import me.jessyan.autosize.unit.Subunits;
 
+import com.undcover.freedom.pyramid.PythonLoader;
+
 /**
  * @author pj567
  * @date :2020/12/17
@@ -57,6 +59,10 @@ public class App extends MultiDexApplication {
                 .setSupportSubunits(Subunits.MM);
         PlayerHelper.init();
         JSEngine.getInstance().create();
+
+        // 添加 Pyramid 支持
+        PythonLoader.getInstance().setApplication(this);
+
         FileUtils.cleanPlayerCache();
     }
 
@@ -65,14 +71,11 @@ public class App extends MultiDexApplication {
         Hawk.init(this).build();
         Hawk.put(HawkConfig.DEBUG_OPEN, false);
         if (!Hawk.contains(HawkConfig.PLAY_TYPE)) {
-            Hawk.put(HawkConfig.PLAY_TYPE, 1);          // 播放器   0=系统, 1=IJK, 2=Exo
-        Hawk.put(HawkConfig.HOME_REC, 1);               // 首页推荐：0=豆瓣, 1=站点推荐, 2=历史
-        Hawk.put(HawkConfig.HOME_REC_STYLE, true);      // 首页多行：0=首页单行(左右切换)，1=首页多行(上下切换)
-        Hawk.put(HawkConfig.IJK_CODEC, "硬解码");       // IJK解码方式：硬解码
-        Hawk.put(HawkConfig.SEARCH_VIEW, 1);            // 搜索展示：0=文字搜索列表 1=缩略图搜索列表
-        Hawk.put(HawkConfig.FAST_SEARCH_MODE, false);   // 聚合模式：打开 or 关闭
-        Hawk.put(HawkConfig.DOH_URL, 2);                // 安全DNS：0=关闭 1=腾讯 2=阿里 3=360
-        Hawk.put(HawkConfig.IJK_CACHE_PLAY, true);      // IJK缓存：打开 or 关闭
+            Hawk.put(HawkConfig.PLAY_TYPE, 1);
+        Hawk.put(HawkConfig.HOME_REC, 1);               // Home Rec 0=豆瓣, 1=站点推荐, 2=历史
+		Hawk.put(HawkConfig.HOME_REC_STYLE, true);      // 0=首页单行(左右切换)，1=首页多行(上下切换)
+		Hawk.put(HawkConfig.SEARCH_VIEW, 1);            // 0=文字搜索列表 1=缩略图搜索列表
+		Hawk.put(HawkConfig.IJK_CODEC, "硬解码");       // 硬解码
         }
     }
 

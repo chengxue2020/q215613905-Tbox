@@ -48,6 +48,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.github.catvod.crawler.SpiderNull;
+import com.undcover.freedom.pyramid.PythonLoader;
 /**
  * @author pj567
  * @date :2020/12/18
@@ -309,7 +311,11 @@ public class ApiConfig {
     }
 
     private void parseJson(String apiUrl, String jsonStr) {
-        JsonObject infoJson = new Gson().fromJson(jsonStr, JsonObject.class);
+
+        // pyramid
+        PythonLoader.getInstance().setConfig(jsonStr);
+
+		JsonObject infoJson = new Gson().fromJson(jsonStr, JsonObject.class);
         // spider
         spider = DefaultConfig.safeJsonString(infoJson, "spider", "");
         // wallpaper
@@ -627,12 +633,43 @@ public class ApiConfig {
     }
 
     public Spider getCSP(SourceBean sourceBean) {
+
+        
+        // Getting Pyramid api
+        if (sourceBean.getApi().startsWith("py_")) {
+            try {
+                return PythonLoader.getInstance().getSpider(sourceBean.getKey(), sourceBean.getExt());
+            } catch (Exception e) {
+                e.printStackTrace();
+                return new SpiderNull();
+            }
+        }
+		
         boolean js = sourceBean.getApi().endsWith(".js") || sourceBean.getApi().contains(".js?");
         if (js) return jsLoader.getSpider(sourceBean.getKey(), sourceBean.getApi(), sourceBean.getExt(), sourceBean.getJar());
         return jarLoader.getSpider(sourceBean.getKey(), sourceBean.getApi(), sourceBean.getExt(), sourceBean.getJar());
     }
 
     public Object[] proxyLocal(Map param) {
+
+        
+		// 获取 pyramid API
+        try {
+            if (param.containsKey("api")) {
+                String doStr = param.get("do").toString();
+                if (doStr.equals("ck"))
+                    return PythonLoader.getInstance().proxyLocal("", "", param);
+                SourceBean sourceBean = ApiConfig.get().getSource(doStr);
+                return PythonLoader.getInstance().proxyLocal(sourceBean.getKey(), sourceBean.getExt(), param);
+            } else {
+                String doStr = param.get("do").toString();
+                if (doStr.equals("live"))
+                    return PythonLoader.getInstance().proxyLocal("", "", param);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         return jarLoader.proxyInvoke(param);
     }
 
