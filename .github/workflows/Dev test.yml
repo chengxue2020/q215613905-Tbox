@@ -159,12 +159,6 @@ jobs:
             TVBoxOSC/apk/*.apk
             TVBoxOSC/apk/sourceCode-${{ env.commitS }}.*
 
-      - name: Upload Binary
-        uses: actions/upload-artifact@master
-        with:
-          name: telegram-bot-api-binary
-          path: telegram-bot-api-binary
-
   clean:
     needs: build
     runs-on: ubuntu-latest
