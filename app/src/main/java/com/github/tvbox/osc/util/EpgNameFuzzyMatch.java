@@ -51,7 +51,7 @@ public class EpgNameFuzzyMatch {
         }
 
         //上述两种途径都失败后,读取网络自定义文件中的内容
-        GetRequest<String> request = OkGo.<String>get("http://www.baidu.com/maotv/epg.json");
+        GetRequest<String> request = OkGo.<String>get("https://diy.deni.xin/tvbox/epg.json");
         request.headers("User-Agent", UA.random());
         request.execute(new AbsCallback<String>() {
             @Override

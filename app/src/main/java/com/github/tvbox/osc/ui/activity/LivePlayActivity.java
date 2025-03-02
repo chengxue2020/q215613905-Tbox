@@ -198,7 +198,7 @@ public class LivePlayActivity extends BaseActivity {
     @Override
     protected void init() {
         context = this;
-        epgStringAddress = Hawk.get(HawkConfig.EPG_URL,"");
+        epgStringAddress = Hawk.get(HawkConfig.EPG_URL,"https://epg.112114.xyz");
         if(epgStringAddress == null || epgStringAddress.length()<5)
             epgStringAddress = "http://epg.51zmt.top:8000/api/diyp/";
 
