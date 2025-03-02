@@ -59,7 +59,7 @@ public class AudioWaveView extends View {
 
     private void init() {
         paint = new Paint();
-        paint.setColor(Color.RED);//字节跳动颜色
+        paint.setColor(Color.WHITE);//字节跳动颜色
         paint.setStyle(Paint.Style.FILL);
         random = new Random();
 
