@@ -723,6 +723,7 @@
 		android:layout_marginRight="25mm"
 
 		android:minWidth="270px">
+		<!--
 		<ImageView
 			android:id="@+id/iv_circle_bg"
 			android:layout_width="@dimen/vs_40"
@@ -732,6 +733,7 @@
 			android:layout_alignParentTop="true"
 			android:layout_alignParentRight="true"
 			android:layout_alignParentBottom="true" />
+			-->
 		<ImageView
 			android:layout_width="@dimen/vs_40"
 			android:layout_height="@dimen/vs_40"
@@ -743,7 +745,7 @@
 
 		<com.github.tvbox.osc.ui.tv.widget.MarqueeTextView
 			android:id="@+id/tv_right_top_channel_name"
-			android:layout_width="@dimen/vs_150"
+			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
 			android:layout_alignParentTop="true"
 			android:layout_marginEnd="@dimen/vs_5"
@@ -760,7 +762,7 @@
 
 		<TextView
 			android:id="@+id/tv_right_top_tipnetspeed"
-			android:layout_width="@dimen/vs_150"
+			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
 			android:layout_alignParentBottom="true"
 			android:layout_gravity="center"
