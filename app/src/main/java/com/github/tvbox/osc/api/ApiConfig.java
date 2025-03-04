@@ -12,6 +12,8 @@ import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.bean.LiveChannelGroup;
 import com.github.tvbox.osc.bean.IJKCode;
 import com.github.tvbox.osc.bean.LiveChannelItem;
+import com.github.tvbox.osc.bean.LiveSettingGroup;
+import com.github.tvbox.osc.bean.LiveSettingItem;
 import com.github.tvbox.osc.bean.ParseBean;
 import com.github.tvbox.osc.bean.SourceBean;
 import com.github.tvbox.osc.server.ControlManager;
@@ -41,6 +43,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -383,13 +386,32 @@ public class ApiConfig {
             if (mDefaultParse == null)
                 setDefaultParse(parseBeanList.get(0));
         }
+
         // 直播源
+        initLiveSettings();
         if(infoJson.has("lives")){
             JsonArray lives_groups=infoJson.get("lives").getAsJsonArray();
             int live_group_index=Hawk.get(HawkConfig.LIVE_GROUP_INDEX,0);
             if(live_group_index>lives_groups.size()-1)Hawk.put(HawkConfig.LIVE_GROUP_INDEX,0);
-            JsonObject livesOBJ = lives_groups.get(live_group_index).getAsJsonObject();
             Hawk.put(HawkConfig.LIVE_GROUP_LIST,lives_groups);
+            //加载多源配置
+            try {
+                ArrayList<LiveSettingItem> liveSettingItemList = new ArrayList<>();
+                for (int i=0; i< lives_groups.size();i++) {
+                    JsonObject jsonObject = lives_groups.get(i).getAsJsonObject();
+                    String name = jsonObject.has("name")?jsonObject.get("name").getAsString():"线路"+(i+1);
+                    LiveSettingItem liveSettingItem = new LiveSettingItem();
+                    liveSettingItem.setItemIndex(i);
+                    liveSettingItem.setItemName(name);
+                    liveSettingItemList.add(liveSettingItem);
+                }
+                liveSettingGroupList.get(5).setLiveSettingItems(liveSettingItemList);
+            } catch (Exception e) {
+                // 捕获任何可能发生的异常
+                e.printStackTrace();
+            }
+
+            JsonObject livesOBJ = lives_groups.get(live_group_index).getAsJsonObject();
             loadLiveApi(livesOBJ);
         }
 
@@ -512,6 +534,45 @@ public class ApiConfig {
         }
     }
 
+    private final List<LiveSettingGroup> liveSettingGroupList = new ArrayList<>();
+    private void initLiveSettings() {
+        ArrayList<String> groupNames = new ArrayList<>(Arrays.asList("线路选择", "画面比例", "播放解码", "超时换源", "偏好设置", "多源切换"));
+        ArrayList<ArrayList<String>> itemsArrayList = new ArrayList<>();
+        ArrayList<String> sourceItems = new ArrayList<>();
+        ArrayList<String> scaleItems = new ArrayList<>(Arrays.asList("默认", "16:9", "4:3", "填充", "原始", "裁剪"));
+        ArrayList<String> playerDecoderItems = new ArrayList<>(Arrays.asList("系统", "ijk硬解", "ijk软解", "exo"));
+        ArrayList<String> timeoutItems = new ArrayList<>(Arrays.asList("5s", "10s", "15s", "20s", "25s", "30s"));
+        ArrayList<String> personalSettingItems = new ArrayList<>(Arrays.asList("显示时间", "显示网速", "换台反转", "跨选分类"));
+        ArrayList<String> yumItems = new ArrayList<>();
+
+        itemsArrayList.add(sourceItems);
+        itemsArrayList.add(scaleItems);
+        itemsArrayList.add(playerDecoderItems);
+        itemsArrayList.add(timeoutItems);
+        itemsArrayList.add(personalSettingItems);
+        itemsArrayList.add(yumItems);
+
+        liveSettingGroupList.clear();
+        for (int i = 0; i < groupNames.size(); i++) {
+            LiveSettingGroup liveSettingGroup = new LiveSettingGroup();
+            ArrayList<LiveSettingItem> liveSettingItemList = new ArrayList<>();
+            liveSettingGroup.setGroupIndex(i);
+            liveSettingGroup.setGroupName(groupNames.get(i));
+            for (int j = 0; j < itemsArrayList.get(i).size(); j++) {
+                LiveSettingItem liveSettingItem = new LiveSettingItem();
+                liveSettingItem.setItemIndex(j);
+                liveSettingItem.setItemName(itemsArrayList.get(i).get(j));
+                liveSettingItemList.add(liveSettingItem);
+            }
+            liveSettingGroup.setLiveSettingItems(liveSettingItemList);
+            liveSettingGroupList.add(liveSettingGroup);
+        }
+    }
+
+    public List<LiveSettingGroup> getLiveSettingGroupList() {
+        return liveSettingGroupList;
+    }
+
     public void loadLives(JsonArray livesArray) {
         liveChannelGroupList.clear();
         int groupIndex = 0;
@@ -557,18 +618,14 @@ public class ApiConfig {
     }
 
     public void loadLiveApi(JsonObject livesOBJ) {
-        // 直播源
-        liveChannelGroupList.clear();           //修复从后台切换重复加载频道列表
         try {
-            String type= livesOBJ.get("type").getAsString();
             String lives = livesOBJ.toString();
             int index = lives.indexOf("proxy://");
+            String url;
             if (index != -1) {
                 int endIndex = lives.lastIndexOf("\"");
-                String url = lives.substring(index, endIndex);
+                url = lives.substring(index, endIndex);
                 url = DefaultConfig.checkReplaceProxy(url);
-
-                //clan
                 String extUrl = Uri.parse(url).getQueryParameter("ext");
                 if (extUrl != null && !extUrl.isEmpty()) {
                     String extUrlFix;
@@ -577,52 +634,35 @@ public class ApiConfig {
                     }else {
                         extUrlFix = new String(Base64.decode(extUrl, Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP), "UTF-8");
                     }
-//                    System.out.println("extUrlFix :"+extUrlFix);
-//                    if (extUrlFix.startsWith("clan://")) {
-//                        extUrlFix = clanContentFix(clanToAddress(apiUrl), extUrlFix);
-//                    }
                     extUrlFix = Base64.encodeToString(extUrlFix.getBytes("UTF-8"), Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP);
                     url = url.replace(extUrl, extUrlFix);
                 }
-//                System.out.println("urlLive :"+url);
-
-                //设置epg
-                if(livesOBJ.has("epg")){
-                    String epg =livesOBJ.get("epg").getAsString();
-                    Hawk.put(HawkConfig.EPG_URL,epg);
-                }
-                //直播播放器类型
-                if(livesOBJ.has("playerType")){
-                    String livePlayType =livesOBJ.get("playerType").getAsString();
-                    Hawk.put(HawkConfig.LIVE_PLAY_TYPE,livePlayType);
-                }
-
-                LiveChannelGroup liveChannelGroup = new LiveChannelGroup();
-                liveChannelGroup.setGroupName(url);
-                liveChannelGroupList.add(liveChannelGroup);
             } else {
-                    if(type.equals("0")){
-                        String url = livesOBJ.get("url").getAsString();
-                        //设置epg
-                        if(livesOBJ.has("epg")){
-                            String epg = livesOBJ.get("epg").getAsString();
-                            Hawk.put(HawkConfig.EPG_URL,epg);
-                        }
-                        //直播播放器类型
-                        if(livesOBJ.has("playerType")){
-                            String livePlayType =livesOBJ.get("playerType").getAsString();
-                            Hawk.put(HawkConfig.LIVE_PLAY_TYPE,livePlayType);
-                        }
-
-                        if(url.startsWith("http")){
-                            url = Base64.encodeToString(url.getBytes("UTF-8"), Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP);
-                        }
-                        url ="http://127.0.0.1:9978/proxy?do=live&type=txt&ext="+url;
-                        LiveChannelGroup liveChannelGroup = new LiveChannelGroup();
-                        liveChannelGroup.setGroupName(url);
-                        liveChannelGroupList.add(liveChannelGroup);
+                String type= livesOBJ.get("type").getAsString();
+                if(type.equals("0")){
+                    url = livesOBJ.get("url").getAsString();
+                    if(url.startsWith("http")){
+                        url = Base64.encodeToString(url.getBytes("UTF-8"), Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP);
                     }
+                    url ="http://127.0.0.1:9978/proxy?do=live&type=txt&ext="+url;
+                }else {
+                    return;
+                }
             }
+            //设置epg
+            if(livesOBJ.has("epg")){
+                String epg =livesOBJ.get("epg").getAsString();
+                Hawk.put(HawkConfig.EPG_URL,epg);
+            }
+            //直播播放器类型
+            if(livesOBJ.has("playerType")){
+                String livePlayType =livesOBJ.get("playerType").getAsString();
+                Hawk.put(HawkConfig.LIVE_PLAY_TYPE,livePlayType);
+            }
+            LiveChannelGroup liveChannelGroup = new LiveChannelGroup();
+            liveChannelGroup.setGroupName(url);
+            liveChannelGroupList.clear();
+            liveChannelGroupList.add(liveChannelGroup);
         } catch (Throwable th) {
             th.printStackTrace();
         }

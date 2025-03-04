@@ -402,7 +402,7 @@ public class SourceViewModel extends ViewModel {
                     });
                     String sortJson = null;
                     try {
-                        sortJson = future.get(15, TimeUnit.SECONDS);
+                        sortJson = future.get(10, TimeUnit.SECONDS);
                     } catch (TimeoutException e) {
                         e.printStackTrace();
                         future.cancel(true);
@@ -495,15 +495,34 @@ public class SourceViewModel extends ViewModel {
             spThreadPool.execute(new Runnable() {
                 @Override
                 public void run() {
+                    ExecutorService executor = Executors.newSingleThreadExecutor();
+                    Future<String> future = executor.submit(new Callable<String>() {
+                        @Override
+                        public String call() {
+                            Spider sp = ApiConfig.get().getCSP(sourceBean);
+                            List<String> ids = new ArrayList<>();
+                            ids.add(id);
+                            try {
+                                return sp.detailContent(ids);
+                            } catch (Exception e) {
+                                LOG.i("echo--getDetail--error: " + e.getMessage());
+                                return "";
+                            }
+                        }
+                    });
+
+                    String json = null;
                     try {
-                        Spider sp = ApiConfig.get().getCSP(sourceBean);
-                        List<String> ids = new ArrayList<>();
-                        ids.add(id);
-                        String json=sp.detailContent(ids);
-                        LOG.i("JSON:"+json);
+                        json = future.get(8, TimeUnit.SECONDS);
+                        LOG.i("echo--getDetail--result:" + json);
+                    } catch (TimeoutException e) {
+                        LOG.i("echo--getDetail--timeout");
+                        future.cancel(true);
+                    } catch (Exception e) {
+                        LOG.i("echo--getDetail--error: " + e.getMessage());
+                    } finally {
                         json(detailResult, json, sourceBean.getKey());
-                    } catch (Throwable th) {
-                        th.printStackTrace();
+                        executor.shutdown();
                     }
                 }
             });
@@ -731,7 +750,7 @@ public class SourceViewModel extends ViewModel {
                     });
 
                     try {
-                        String json = future.get(8, TimeUnit.SECONDS);
+                        String json = future.get(10, TimeUnit.SECONDS);
                         LOG.i("echo--getPlay--result:" + json);
                         // 处理返回的 JSON
                         if (!TextUtils.isEmpty(json)) {

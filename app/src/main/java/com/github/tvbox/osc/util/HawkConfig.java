@@ -44,5 +44,6 @@ public class HawkConfig {
     public static final String LIVE_GROUP_INDEX = "live_group_index";
     public static final String LIVE_GROUP_LIST = "live_group_list";
     public static final String LIVE_API_URL = "live_api_url";
+    public static final String M3U8_PURIFY = "m3u8_purify";
     public static boolean hotVodDelete;
 }

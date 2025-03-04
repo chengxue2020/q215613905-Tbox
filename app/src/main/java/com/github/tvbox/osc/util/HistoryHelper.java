@@ -1,7 +1,7 @@
 package com.github.tvbox.osc.util;
 
 public class HistoryHelper {
-    private static Integer[] hisNumArray = {30,50,70};
+    private static Integer[] hisNumArray = {30,50,100};
 
     public static final String getHistoryNumName(int index){
         Integer value = getHisNum(index);

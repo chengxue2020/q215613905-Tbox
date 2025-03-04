@@ -92,7 +92,7 @@ public class VideoParseRuler {
                             checkIsVideo = false;
                             break;
                         }
-                        LOG.i("VIDEO RULE:" + hostRules.get(i).get(j));
+                        LOG.i("echo-VIDEO RULE:" + hostRules.get(i).get(j));
                     }
                 } else {
                     checkIsVideo = false;
@@ -139,7 +139,7 @@ public class VideoParseRuler {
                             checkIsFilter = false;
                             break;
                         }
-                        LOG.i("FILTER RULE:" + hostFilters.get(i).get(j));
+                        LOG.i("echo-FILTER RULE:" + hostFilters.get(i).get(j));
                     }
                 } else {
                     checkIsFilter = false;
