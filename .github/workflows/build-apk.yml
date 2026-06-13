@@ -1,0 +1,85 @@
+name: build-apk.yml
+
+on:
+  workflow_dispatch:
+    inputs:
+      rebuild:
+        description: '忽略构建记录以重新构建'
+        required: false
+        type: boolean
+        default: true # 👈 默认直接开启强编
+      donotpublish:
+        description: '构建后不提交发布新版'
+        required: false
+        type: boolean
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. 签出当前仓库
+        uses: actions/checkout@v4
+        with:
+          token: ${{ github.token }}
+
+      - name: 🚀 2. 绕过检测：直接克隆原作者的 TVBoxOS 源码
+        run: |
+          # 直接使用官方标准的克隆命令，100% 成功且绝对不会报 404
+          git clone https://github.com/q215613905/TVBoxOS.git TVBoxOSC
+          cd TVBoxOSC
+          echo "tag=$(date +'%Y%m%d-%H%M')" >> $GITHUB_ENV
+
+      - name: 3. 修改基础配置
+        working-directory: TVBoxOSC
+        run: |
+          sed -i "/versionName/s#[0-9a-zA-Z_\.\'\"-]\+\$#\'${{ env.tag }}\'#" app/build.gradle || true
+          sed -i "/android:text=/s#=\"#=\"${{ env.tag }}\\\\n\\\\n#" app/src/main/res/layout/dialog_about.xml || true
+          
+          if grep -q 'crosswalk' build.gradle; then
+            sed -i "/crosswalk/a\        maven { url 'https://o0halflife0o.github.io/crosswalk/releases/crosswalk/android/maven2' }" build.gradle
+          else
+            sed -i "/jitpack.io/a\        maven { url 'https://o0halflife0o.github.io/crosswalk/releases/crosswalk/android/maven2' }" build.gradle
+          fi
+
+      - name: 4. 注入 Python 路径覆盖补丁 & 自动捏出签名证书
+        working-directory: TVBoxOSC
+        run: |
+          # 1. 强制写入最高的配置文件，把写死的 D 盘 Python 强行换成 Linux 系统的 Python3
+          touch local.properties
+          echo "sdk.dir=/usr/lib/android-sdk" > local.properties
+          echo "chaquopy.buildPython=/usr/bin/python3" >> local.properties
+          
+          # 2. 破除原作者的正式签名锁，自动捏出一个临时正式签名，防止打包时崩溃
+          keytool -genkey -v -keystore app/TVBoxOSC.jks -keyalg RSA -keysize 2048 -validity 10000 -alias TVBoxOSC -storepass TVBoxOSC -keypass TVBoxOSC -dname "CN=Unknown, OU=Unknown, O=Unknown, L=Unknown, S=Unknown, C=Unknown"
+          
+          sed -i '$a\RELEASE_STORE_FILE=./TVBoxOSC.jks'     ./gradle.properties
+          sed -i '$a\RELEASE_KEY_ALIAS=TVBoxOSC'            ./gradle.properties
+          sed -i '$a\RELEASE_STORE_PASSWORD=TVBoxOSC'       ./gradle.properties
+          sed -i '$a\RELEASE_KEY_PASSWORD=TVBoxOSC'         ./gradle.properties
+
+      - name: 5. 强制配置 Java 11 兼容环境
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+          cache: 'gradle'
+
+      - name: 6. 开始用 Gradle 编译正式版 APK 
+        working-directory: TVBoxOSC
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --build-cache --parallel --no-daemon
+
+      - name: 7. 收集并整理打包好的 APK 成品
+        working-directory: TVBoxOSC
+        run: |
+          rm -rf apk/
+          mkdir -p apk/
+          # 搜寻所有生成的正式版打包文件并移入发布夹
+          find . -name "*release*.apk" -exec mv {} apk/ \;
+
+      - name: 🎉 8. 将成品 APK 发送到网页提供下载
+        uses: actions/upload-artifact@v4
+        with:
+          name: TVBoxOS-Official-Release
+          path: TVBoxOSC/apk/*
