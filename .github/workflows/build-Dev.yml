@@ -1,0 +1,46 @@
+name: Build TVBox-Dev
+
+on:
+  push:
+    branches: [ Dev ]
+  workflow_dispatch:
+    inputs:
+      buildType:
+        description: '构建类型 (debug/release)'
+        required: true
+        default: 'release'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Create local.properties
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - name: Build with Gradle
+        run: |
+          chmod +x gradlew
+          # 只构建 normal + armeabi-v7a (Java版，兼容安卓6)
+          ./gradlew assembleNormalDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TVBox-armeabi-v7a
+          path: app/build/outputs/apk/normal/debug/*.apk
+          retention-days: 30

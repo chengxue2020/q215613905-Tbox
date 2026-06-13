@@ -1,4 +1,4 @@
-name: Test
+name: Test-Dev
 
 on:
   schedule:
@@ -21,9 +21,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - userName: q215613905
-            repoName: TVBoxOS
-            branchName: main
+          - userName: chengxue2020
+            repoName: q215613905-Tbox
+            branchName: Dev
     steps:
       - name: Checkout
         uses: actions/checkout@v4
