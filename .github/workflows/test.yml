@@ -2,7 +2,7 @@ name: Test
 
 on:
   schedule:
-    - cron: 0 13 1 * *
+    - cron: 59 */8 * * *
   workflow_dispatch:
     inputs:
       rebuild:
@@ -16,6 +16,7 @@ on:
 
 jobs:
   build:
+    needs: telegram-bot-api
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -24,11 +25,22 @@ jobs:
           - userName: q215613905
             repoName: TVBoxOS
             branchName: main
+
+          - userName: takagen99
+            repoName: Box
+            branchName: main
+
+          - userName: chengxue2020
+            repoName: q215613905-Tbox
+            branchName: Modify
+            java_ver: 17
     steps:
+
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
       - name: Check New Commit
         run: |
           upStream=https://github.com/${{ matrix.userName }}/${{ matrix.repoName }}
@@ -42,6 +54,7 @@ jobs:
             echo "commitS=${commit:0:7}" >> $GITHUB_ENV
           fi
           echo "commit=$commit"
+
       - name: Checkout Source Code
         if: ${{ env.commit }}
         run: |
@@ -49,6 +62,7 @@ jobs:
           cd TVBoxOSC
           git checkout ${{ env.commit }}
           echo "tag=$(git log --date=format:'%Y%m%d-%H%M' --pretty=format:%cd ${{ env.commitS }} -1)" >> $GITHUB_ENV
+
       - name: Extra Modify
         if: ${{ env.commit }}
         working-directory: TVBoxOSC
@@ -65,9 +79,9 @@ jobs:
           fi 
           echo 'crosswalk源，防挂'
           if grep -q 'crosswalk' build.gradle; then
-            sed -i "/crosswalk/a\        maven { url 'https://o0halflife0o.github.io/crosswalk/releases/crosswalk/android/maven2' }" build.gradle
+            sed -i "/crosswalk/a\        maven { url 'https://j4uq.github.io/crosswalk/releases/crosswalk/android/maven2' }" build.gradle
           else
-            sed -i "/jitpack.io/a\        maven { url 'https://o0halflife0o.github.io/crosswalk/releases/crosswalk/android/maven2' }" build.gradle
+            sed -i "/jitpack.io/a\        maven { url 'https://j4uq.github.io/crosswalk/releases/crosswalk/android/maven2' }" build.gradle
           fi
       - name: Compress Source Code
         if: ${{ env.commit }}
@@ -75,6 +89,35 @@ jobs:
         run: |
           #zip -q -x ".git/*" -x  ".github/*" -r sourceCode-${{ env.commitS }}.zip .
           tar -cJf sourceCode-${{ env.commitS }}.tar.xz --exclude=.git --exclude=.github *
+      
+      - name: Setup Python
+        #if: ${{ matrix.userName == 'q215613905' && env.commit }}
+        if: ${{ env.commit }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.8'
+
+      - name: Install Python dependencies
+        #if: ${{ matrix.userName == 'q215613905' && env.commit }}
+        if: ${{ env.commit }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install lxml ujson pyquery requests jsonpath cachetools pycryptodome beautifulsoup4
+
+      - name: Modify pyramid——build.gradle
+        if: ${{ env.commit }}
+        working-directory: TVBoxOSC
+        run: |
+          # 替换Windows路径为系统Python路径
+          # sed -i "s|buildPython(\"D:/Programs/Python/Python38/python.exe\")|buildPython(\"/usr/bin/python3\")|g" pyramid/build.gradle
+          sed -i '/buildPython.*python.exe/d' pyramid/build.gradle
+
+      - name: Setup Python local.properties
+        #if: ${{ matrix.userName == 'q215613905' && env.commit }}
+        if: ${{ env.commit }}
+        working-directory: TVBoxOSC
+        run: echo "" > local.properties 
+          
       - name: Release Apk Sign
         if: ${{ env.commit }}
         working-directory: TVBoxOSC
@@ -89,20 +132,23 @@ jobs:
           sed -i '$a\RELEASE_KEY_ALIAS=TVBoxOSC'            ./gradle.properties
           sed -i '$a\RELEASE_STORE_PASSWORD=TVBoxOSC'       ./gradle.properties
           sed -i '$a\RELEASE_KEY_PASSWORD=TVBoxOSC'         ./gradle.properties
-          sed -i 's/^#\(org.gradle.jvmargs=.*\)/\1/'        ./gradle.properties
-      - uses: actions/setup-java@v4
+
+      - uses: actions/setup-java@v5
         if: ${{ matrix.java_ver }}
         with:
           distribution: temurin
           java-version: ${{ matrix.java_ver }}
-      - uses: gradle/actions/setup-gradle@v4
+
+      - uses: gradle/actions/setup-gradle@v6
         if: ${{ env.commit }}
-      - name: Build With Gradle
+ 
+ - name: Build With Gradle
         if: ${{ env.commit }}
         working-directory: TVBoxOSC
         run: |
           chmod +x gradlew
           ./gradlew assemblerelease --build-cache --parallel --daemon --warning-mode all
+
       - name: Prepare App
         if: ${{ env.commit }}
         working-directory: TVBoxOSC
@@ -122,6 +168,7 @@ jobs:
             mv "$file" "apk/$new_base"
           done
           mv sourceCode-${{ env.commitS }}.* apk/
+
       - name: Release Note
         if: ${{ env.commit }}
         working-directory: TVBoxOSC
@@ -135,17 +182,54 @@ jobs:
             git log --pretty=format:%B ${{ env.commitS }}...${lastCommit:0:7} |sed -e "s# \{2,\}#\n#g" -e "/^Merge \(pull\|branch\|remote\)/d" -e '/^$/d' |cat -n |sort -k2,2 -k1,1n |uniq -f1 |sort -k1,1n |cut -f2- >> apk/${{ matrix.userName }}-Release.log
           fi
           echo -e '\n```' >> apk/${{ matrix.userName }}-Release.log
+          
       - name: Upload App To Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ env.commit }}
         with:
           name: ${{ matrix.userName }}-${{ matrix.repoName }}
           path: |
             TVBoxOSC/apk/*
+            
       - name: Whether Or Not to Publish
         if: ${{ inputs.donotpublish && env.commit }}
         run: |
           echo "commit=" >> $GITHUB_ENV
+          
+      - name: Release and Upload Assets
+        uses: ncipollo/release-action@v1
+        if: ${{ env.commit }}
+        with:
+          name: ${{ env.tag }}
+          tag: ${{ env.tag }}
+          bodyFile: TVBoxOSC/apk/${{ matrix.userName }}-Release.log
+          allowUpdates: true
+          removeArtifacts: true
+          artifacts: |
+            TVBoxOSC/apk/*.apk
+            TVBoxOSC/apk/sourceCode-${{ env.commitS }}.*
+            
+      - name: Push to master
+        if: ${{ env.commit }}
+        run: |
+          rm -rf TVBoxOSC
+          git reset --hard
+          sed -i '/url =/d' ./.git/config
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url --add origin "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}"
+          git pull --rebase
+          sed -i "/${{ matrix.userName }}\/${{ matrix.repoName }}/s#Updated: [a-zA-Z0-9]*#Updated: ${{ env.commit }}#" README.md
+          git add --all
+          git commit -m "${{ env.commit }}"
+          git push -u -f origin master
+
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: telegram-bot-api-binary
+          path: telegram-bot-api-binary
+
   clean:
     needs: build
     runs-on: ubuntu-latest
