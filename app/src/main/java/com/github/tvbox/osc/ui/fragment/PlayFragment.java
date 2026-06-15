@@ -119,8 +119,10 @@ import xyz.doikki.videoplayer.player.VideoView;
 
 public class PlayFragment extends BaseLazyFragment {
     private static final int MSG_PARSE_TIMEOUT = 100;
-    private static final int MSG_PLAY_TIMEOUT = 101;
-    private static final long PLAY_TIMEOUT_MS = 6 * 1000L;
+    private static final int MSG_RESOLVE_PLAY_URL_TIMEOUT = 101;
+    private static final int MSG_SWITCH_LINE_PLAY_TIMEOUT = 102;
+    private static final long RESOLVE_PLAY_URL_TIMEOUT_MS = 8 * 1000L;
+    private static final long SWITCH_LINE_PLAY_TIMEOUT_MS = 8 * 1000L;
     private MyVideoView mVideoView;
     private TextView mPlayLoadTip;
     private ImageView mPlayLoadErr;
@@ -188,11 +190,11 @@ public class PlayFragment extends BaseLazyFragment {
                         stopParse();
                         errorWithRetry("嗅探错误", false);
                         break;
-                    case MSG_PLAY_TIMEOUT:
-                        // 播放超时先走统一重试，避免未切播放器就直接切线路
-                        LOG.i("echo-playTimeout exceeded, retry current url first");
-                        stopParse();
-                        errorWithRetry("播放超时", false);
+                    case MSG_RESOLVE_PLAY_URL_TIMEOUT:
+                        handleResolvePlayUrlTimeout();
+                        break;
+                    case MSG_SWITCH_LINE_PLAY_TIMEOUT:
+                        handleSwitchLinePlayTimeout();
                         break;
                 }
                 return false;
@@ -210,6 +212,10 @@ public class PlayFragment extends BaseLazyFragment {
             @Override
             public void saveProgress(String url, long progress) {
                 CacheManager.save(MD5.string2MD5(url), progress);
+                if (progress > 0 && webPlayUrl != null) {
+                    cancelPlayTimeout();
+                    hideTipOnUiThread();
+                }
             }
 
             @Override
@@ -221,8 +227,9 @@ public class PlayFragment extends BaseLazyFragment {
         mVideoView.addOnStateChangeListener(new VideoView.SimpleOnStateChangeListener() {
             @Override
             public void onPlayStateChanged(int playState) {
-                if (playState == VideoView.STATE_PLAYING) {
+                if (webPlayUrl != null && (playState == VideoView.STATE_PREPARED || playState == VideoView.STATE_BUFFERED || playState == VideoView.STATE_PLAYING)) {
                     cancelPlayTimeout();
+                    hideTipOnUiThread();
                 }
             }
         });
@@ -266,6 +273,7 @@ public class PlayFragment extends BaseLazyFragment {
                         stopParse();
                         initParseLoadFound();
                         if(mVideoView!=null) mVideoView.release();
+                        startSwitchLinePlayTimeout();
                         goPlayUrl(webPlayUrl,webHeaderMap);
                     }else {
                         play(false);
@@ -541,12 +549,27 @@ public class PlayFragment extends BaseLazyFragment {
         mPlayLoadErr.setVisibility(View.GONE);
     }
 
+    void hideTipOnUiThread() {
+        if (!isAdded()) return;
+        requireActivity().runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                hideTip();
+            }
+        });
+    }
+
     void errorWithRetry(String err, boolean finish) {
         if (!autoRetry()) {
             if (!isAdded()) return;
             requireActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
+                    if ("播放超时".equals(err) && isPlaybackStarted()) {
+                        cancelPlayTimeout();
+                        hideTip();
+                        return;
+                    }
                     if (finish) {
                         setTip(err, false, true);
                         Toast.makeText(mContext, err, Toast.LENGTH_SHORT).show();
@@ -559,6 +582,7 @@ public class PlayFragment extends BaseLazyFragment {
     }
 
     void playUrl(String url, HashMap<String, String> headers) {
+        startSwitchLinePlayTimeout();
         if(!url.startsWith("data:application"))EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_REFRESH, url));//更新播放地址
         if (!Hawk.get(HawkConfig.M3U8_PURIFY, false)) {
             goPlayUrl(url,headers);
@@ -691,9 +715,13 @@ public class PlayFragment extends BaseLazyFragment {
         sourceViewModel.playResult.observe(this, new Observer<JSONObject>() {
             @Override
             public void onChanged(JSONObject info) {
-                webPlayUrl = null;
                 if (info != null) {
                     try {
+                        if (isStalePlayResult(info)) {
+                            LOG.i("echo-ignore stale play result");
+                            return;
+                        }
+                        webPlayUrl = null;
                         progressKey = info.optString("proKey", null);
                         boolean parse = info.optString("parse", "1").equals("1");
                         boolean jx = info.optString("jx", "0").equals("1");
@@ -768,13 +796,28 @@ public class PlayFragment extends BaseLazyFragment {
                             playUrl(playUrl + url, headers);
                         }
                     } catch (Throwable th) {
+                        handleResolvePlayUrlFailed("获取播放信息错误", true);
                     }
                 } else {
 //                    获取播放信息错误后只需再重试一次
-                    errorWithRetry("获取播放信息错误", true);
+                    handleResolvePlayUrlFailed("获取播放信息错误", true);
                 }
             }
         });
+    }
+
+    boolean isStalePlayResult(JSONObject info) {
+        if (mVodInfo == null || mVodInfo.seriesMap == null || TextUtils.isEmpty(progressKey)) return false;
+        String resultKey = info.optString("proKey", "");
+        if (!TextUtils.isEmpty(resultKey) && !progressKey.equals(resultKey)) return true;
+        String resultFlag = info.optString("flag", "");
+        if (!TextUtils.isEmpty(resultFlag) && !resultFlag.equals(mVodInfo.playFlag)) return true;
+        String sourceUrl = info.optString("key", "");
+        if (!TextUtils.isEmpty(sourceUrl)) {
+            VodInfo.VodSeries vs = getCurrentSeries(mVodInfo.playFlag, mVodInfo.playIndex);
+            return vs != null && !sourceUrl.equals(vs.url);
+        }
+        return false;
     }
 
     public void setData(Bundle bundle) {
@@ -978,7 +1021,7 @@ public class PlayFragment extends BaseLazyFragment {
                 allowSwitchPlayer = false;
                 if (!switchSkipped) {
                     stopParse();
-                    startPlayTimeout();
+                    startSwitchLinePlayTimeout();
                     initParseLoadFound();
                     if(mVideoView!=null) mVideoView.release();
                     playUrl(webPlayUrl, webHeaderMap);
@@ -986,9 +1029,19 @@ public class PlayFragment extends BaseLazyFragment {
                 }
             }
             LOG.i("echo-autoRetry current url failed after player switch, try next line");
-            return tryNextLine();
+            return tryNextLineIfEnabled();
         }
-        return tryNextLine();
+        return tryNextLineIfEnabled();
+    }
+
+    boolean tryNextLineIfEnabled() {
+        if (Hawk.get(HawkConfig.AUTO_SWITCH_LINE, true)) return tryNextLine();
+        LOG.i("echo-autoRetry line switching disabled");
+        autoRetryCount = 0;
+        allowSwitchPlayer = true;
+        hasAutoSwitchedPlayer = false;
+        triedLineFlags.clear();
+        return false;
     }
 
     boolean tryNextLine() {
@@ -1148,7 +1201,6 @@ public class PlayFragment extends BaseLazyFragment {
         stopParse();
         webPlayUrl = null;
         webHeaderMap = null;
-        startPlayTimeout();
         initParseLoadFound();
         allowSwitchPlayer=true;
         hasAutoSwitchedPlayer=false;
@@ -1156,6 +1208,7 @@ public class PlayFragment extends BaseLazyFragment {
         if(mVideoView!=null) mVideoView.release();
         subtitleCacheKey = mVodInfo.sourceKey + "-" + mVodInfo.id + "-" + mVodInfo.playFlag + "-" + mVodInfo.playIndex+ "-" + vs.name + "-subt";
         progressKey = mVodInfo.sourceKey + mVodInfo.id + mVodInfo.playFlag + mVodInfo.playIndex + vs.name;
+        startResolvePlayUrlTimeout();
         //重新播放清除现有进度
         if (reset) {
             CacheManager.delete(MD5.string2MD5(progressKey), 0);
@@ -1277,18 +1330,67 @@ public class PlayFragment extends BaseLazyFragment {
         return taskResult;
     }
 
-    void startPlayTimeout() {
+    void startResolvePlayUrlTimeout() {
         cancelPlayTimeout();
-        mHandler.sendEmptyMessageDelayed(MSG_PLAY_TIMEOUT, PLAY_TIMEOUT_MS);
+        mHandler.sendEmptyMessageDelayed(MSG_RESOLVE_PLAY_URL_TIMEOUT, RESOLVE_PLAY_URL_TIMEOUT_MS);
+    }
+
+    void startSwitchLinePlayTimeout() {
+        cancelPlayTimeout();
+        mHandler.sendEmptyMessageDelayed(MSG_SWITCH_LINE_PLAY_TIMEOUT, SWITCH_LINE_PLAY_TIMEOUT_MS);
+    }
+
+    void cancelSwitchLinePlayTimeout() {
+        cancelPlayTimeout();
     }
 
     void cancelPlayTimeout() {
-        mHandler.removeMessages(MSG_PLAY_TIMEOUT);
+        mHandler.removeMessages(MSG_RESOLVE_PLAY_URL_TIMEOUT);
+        mHandler.removeMessages(MSG_SWITCH_LINE_PLAY_TIMEOUT);
+    }
+
+    boolean isPlaybackStarted() {
+        if (mVideoView == null) return false;
+        int state = mVideoView.getCurrentPlayState();
+        if (state == VideoView.STATE_PLAYING || state == VideoView.STATE_BUFFERED || state == VideoView.STATE_PREPARED) return true;
+        return mVideoView.getCurrentPosition() > 0 || mVideoView.isPlaying();
+    }
+
+    void handleResolvePlayUrlTimeout() {
+        LOG.i("echo-resolvePlayUrl timeout, try next line");
+        if (sourceViewModel != null) sourceViewModel.cancelPlayRequest();
+        stopParse();
+        if (!tryNextLineIfEnabled()) setTip("获取播放地址超时", false, true);
+    }
+
+    void handleResolvePlayUrlFailed(String err, boolean finish) {
+        LOG.i("echo-resolvePlayUrl failed, try next line: " + err);
+        if (sourceViewModel != null) sourceViewModel.cancelPlayRequest();
+        stopParse();
+        if (tryNextLineIfEnabled()) return;
+        if (finish) {
+            setTip(err, false, true);
+            Toast.makeText(mContext, err, Toast.LENGTH_SHORT).show();
+        } else {
+            setTip(err, false, true);
+        }
+    }
+
+    void handleSwitchLinePlayTimeout() {
+        if (isPlaybackStarted()) {
+            cancelPlayTimeout();
+            hideTipOnUiThread();
+            return;
+        }
+        LOG.i("echo-switchLinePlay timeout, try next line");
+        stopParse();
+        if (!tryNextLineIfEnabled()) setTip("播放超时", false, true);
     }
 
     void stopParse() {
         mHandler.removeMessages(MSG_PARSE_TIMEOUT);
         stopLoadWebView(false);
+        OkGo.getInstance().cancelTag("play");
         OkGo.getInstance().cancelTag("json_jx");
         if (parseThreadPool != null) {
             try {

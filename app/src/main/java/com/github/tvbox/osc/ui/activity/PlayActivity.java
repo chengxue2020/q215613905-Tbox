@@ -206,7 +206,6 @@ public class PlayActivity extends BaseActivity {
             @Override
             public void changeParse(ParseBean pb) {
                 autoRetryCount = 0;
-                triedLineFlags.clear();
                 doParse(pb);
             }
 
@@ -219,7 +218,6 @@ public class PlayActivity extends BaseActivity {
             @Override
             public void replay(boolean replay) {
                 autoRetryCount = 0;
-                triedLineFlags.clear();
                 if(replay){
                     play(true);
                 }else {
@@ -748,7 +746,6 @@ public class PlayActivity extends BaseActivity {
             sourceKey = bundle.getString("sourceKey");
             sourceBean = ApiConfig.get().getSource(sourceKey);
             initPlayerCfg();
-            triedLineFlags.clear();
             play(false);
         }
     }
@@ -860,7 +857,6 @@ public class PlayActivity extends BaseActivity {
     private SourceBean sourceBean;
 
     private void playNext(boolean isProgress) {
-        triedLineFlags.clear();
         boolean hasNext = true;
         if (mVodInfo == null || mVodInfo.seriesMap.get(mVodInfo.playFlag) == null) {
             hasNext = false;
@@ -882,7 +878,6 @@ public class PlayActivity extends BaseActivity {
     }
 
     private void playPrevious() {
-        triedLineFlags.clear();
         boolean hasPre = true;
         if (mVodInfo == null || mVodInfo.seriesMap.get(mVodInfo.playFlag) == null) {
             hasPre = false;
@@ -946,14 +941,16 @@ public class PlayActivity extends BaseActivity {
             return true;
         } else {
             // 当前线路重试耗尽，尝试切换下一条线路
-            return tryNextLine();
+            LOG.i("echo-autoRetry line switching disabled in PlayActivity");
+            autoRetryCount = 0;
+            allowSwitchPlayer = true;
+            return false;
         }
     }
 
     boolean tryNextLine() {
         if (mVodInfo == null || mVodInfo.seriesMap == null || mVodInfo.seriesMap.isEmpty()) {
             autoRetryCount = 0;
-            triedLineFlags.clear();
             return false;
         }
         // 将当前线路标记为已尝试

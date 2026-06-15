@@ -1,8 +1,9 @@
 package com.github.tvbox.osc.ui.adapter;
 
+import android.graphics.Typeface;
+import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewParent;
 import android.widget.TextView;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
@@ -10,18 +11,28 @@ import com.chad.library.adapter.base.BaseViewHolder;
 import com.github.tvbox.osc.R;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 
 public class FastListAdapter extends BaseQuickAdapter<String, BaseViewHolder> {
+    private String selectedName = "全部";
+
     public FastListAdapter() {
         super(R.layout.item_search_word_hot, new ArrayList<>());
     }
 
     @Override
     protected void convert(BaseViewHolder helper, String item) {
-        helper.setText(R.id.tvSearchWord, item);
+        TextView textView = helper.getView(R.id.tvSearchWord);
+        boolean selected = TextUtils.equals(item, selectedName);
+        textView.setText(item);
+        textView.setSelected(selected);
+        textView.setBackgroundResource(R.drawable.bg_fast_site_word);
+        textView.setTypeface(Typeface.DEFAULT, selected ? Typeface.BOLD : Typeface.NORMAL);
     }
 
+    public void setSelectedName(String selectedName) {
+        this.selectedName = TextUtils.isEmpty(selectedName) ? "全部" : selectedName;
+        notifyDataSetChanged();
+    }
 
     // 记录失去焦点的控件
     public void onLostFocus(View child) {

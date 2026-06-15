@@ -4,8 +4,10 @@ import android.annotation.SuppressLint;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Outline;
 import android.graphics.PointF;
 import android.graphics.Rect;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.Html;
 import android.text.TextUtils;
@@ -13,6 +15,7 @@ import android.util.DisplayMetrics;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -157,6 +160,7 @@ public class DetailActivity extends BaseActivity {
         llPlayerPlace = findViewById(R.id.previewPlayerPlace);
         llPlayerFragmentContainer = findViewById(R.id.previewPlayer);
         llPlayerFragmentContainerBlock = findViewById(R.id.previewPlayerBlock);
+        applyPreviewRoundCorners();
         ivThumb = findViewById(R.id.ivThumb);
         llPlayerPlace.setVisibility(showPreview ? View.VISIBLE : View.GONE);
         ivThumb.setVisibility(!showPreview ? View.VISIBLE : View.GONE);
@@ -685,6 +689,33 @@ public class DetailActivity extends BaseActivity {
             return "";
         return info.replaceAll("\\<.*?\\>", "").replaceAll("\\s", "");
     }
+
+    private void applyPreviewRoundCorners() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return;
+        }
+        final float radius = getResources().getDimension(R.dimen.preview_player_radius);
+        ViewOutlineProvider provider = new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius);
+            }
+        };
+        llPlayerFragmentContainer.setClipToOutline(true);
+        llPlayerFragmentContainer.setOutlineProvider(provider);
+        llPlayerFragmentContainerBlock.setClipToOutline(true);
+        llPlayerFragmentContainerBlock.setOutlineProvider(provider);
+    }
+
+    private void setPreviewRoundClip(boolean enable) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return;
+        }
+        llPlayerFragmentContainer.setClipToOutline(enable);
+        llPlayerFragmentContainerBlock.setClipToOutline(enable);
+        llPlayerFragmentContainer.setBackgroundResource(enable ? R.drawable.preview_player_round : android.R.color.black);
+    }
+
 
     private void initViewModel() {
         sourceViewModel = new ViewModelProvider(this).get(SourceViewModel.class);
@@ -1217,6 +1248,7 @@ public class DetailActivity extends BaseActivity {
         }
         fullWindows = !fullWindows;
         llPlayerFragmentContainer.setLayoutParams(fullWindows ? windowsFull : windowsPreview);
+        setPreviewRoundClip(!fullWindows);
         llPlayerFragmentContainerBlock.setVisibility(fullWindows ? View.GONE : View.VISIBLE);
         mGridView.setVisibility(fullWindows ? View.GONE : View.VISIBLE);
         mGridViewFlag.setVisibility(fullWindows ? View.GONE : View.VISIBLE);

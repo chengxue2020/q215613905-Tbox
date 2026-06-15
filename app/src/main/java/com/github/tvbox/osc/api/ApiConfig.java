@@ -26,6 +26,7 @@ import com.github.tvbox.osc.util.AdBlocker;
 import com.github.tvbox.osc.util.DefaultConfig;
 import com.github.tvbox.osc.util.FileUtils;
 import com.github.tvbox.osc.util.HawkConfig;
+import com.github.tvbox.osc.util.HistoryHelper;
 import com.github.tvbox.osc.util.LOG;
 import com.github.tvbox.osc.util.M3u8;
 import com.github.tvbox.osc.util.MD5;
@@ -248,7 +249,13 @@ public class ApiConfig {
         File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/" + MD5.encode(apiUrl));
         if (useCache && cache.exists()) {
             try {
-                parseJson(apiUrl, cache);
+                String json = readConfigFile(cache);
+                if (switchApiCollectionIfNeeded(apiUrl, json)) {
+                    loadConfig(false, callback, activity);
+                    return;
+                }
+                clearApiLinesIfUnmatched(apiUrl);
+                parseJson(apiUrl, json);
                 callback.success();
                 return;
             } catch (Throwable th) {
@@ -269,6 +276,12 @@ public class ApiConfig {
                         try {
                             String json = response.body();
 //                            LOG.i("echo-ConfigJson"+json);
+                            if (switchApiCollectionIfNeeded(apiUrl, json)) {
+                                FileUtils.saveCache(cache,json);
+                                loadConfig(false, callback, activity);
+                                return;
+                            }
+                            clearApiLinesIfUnmatched(apiUrl);
                             parseJson(apiUrl, json);
                             FileUtils.saveCache(cache,json);
                             callback.success();
@@ -283,7 +296,13 @@ public class ApiConfig {
                         super.onError(response);
                         if (cache.exists()) {
                             try {
-                                parseJson(apiUrl, cache);
+                                String json = readConfigFile(cache);
+                                if (switchApiCollectionIfNeeded(apiUrl, json)) {
+                                    loadConfig(false, callback, activity);
+                                    return;
+                                }
+                                clearApiLinesIfUnmatched(apiUrl);
+                                parseJson(apiUrl, json);
                                 callback.success();
                                 return;
                             } catch (Throwable th) {
@@ -413,6 +432,10 @@ public class ApiConfig {
     }
 
     private void parseJson(String apiUrl, File f) throws Throwable {
+        parseJson(apiUrl, readConfigFile(f));
+    }
+
+    private String readConfigFile(File f) throws Throwable {
         BufferedReader bReader = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
         StringBuilder sb = new StringBuilder();
         String s = "";
@@ -420,7 +443,88 @@ public class ApiConfig {
             sb.append(s + "\n");
         }
         bReader.close();
-        parseJson(apiUrl, sb.toString());
+        return sb.toString();
+    }
+
+    private boolean switchApiCollectionIfNeeded(String apiUrl, String jsonStr) {
+        ArrayList<String> apiLines = parseApiCollection(jsonStr);
+        if (apiLines.isEmpty()) {
+            return false;
+        }
+        String firstApi = HistoryHelper.getApiLineUrl(apiLines.get(0));
+        if (TextUtils.isEmpty(firstApi) || firstApi.equals(apiUrl)) {
+            return false;
+        }
+        Hawk.put(HawkConfig.API_LINE_LIST, apiLines);
+        Hawk.put(HawkConfig.API_LINE_SOURCE, apiUrl);
+        Hawk.put(HawkConfig.API_URL, firstApi);
+        HistoryHelper.setApiHistory(apiUrl);
+        String liveApiUrl = Hawk.get(HawkConfig.LIVE_API_URL, "");
+        if (TextUtils.isEmpty(liveApiUrl) || liveApiUrl.equals(apiUrl)) {
+            Hawk.put(HawkConfig.LIVE_API_URL, firstApi);
+            HistoryHelper.setLiveApiHistory(firstApi);
+        }
+        return true;
+    }
+
+    private ArrayList<String> parseApiCollection(String jsonStr) {
+        ArrayList<String> apiLines = new ArrayList<>();
+        try {
+            String json = trimJsonObject(jsonStr);
+            if (TextUtils.isEmpty(json)) {
+                return apiLines;
+            }
+            JsonObject infoJson = gson.fromJson(json, JsonObject.class);
+            if (infoJson == null || infoJson.has("sites") || !infoJson.has("urls") || !infoJson.get("urls").isJsonArray()) {
+                return apiLines;
+            }
+            JsonArray urls = infoJson.get("urls").getAsJsonArray();
+            for (JsonElement element : urls) {
+                String name = "";
+                String url = "";
+                if (element.isJsonObject()) {
+                    JsonObject item = element.getAsJsonObject();
+                    name = DefaultConfig.safeJsonString(item, "name", "");
+                    url = DefaultConfig.safeJsonString(item, "url", "");
+                    if (TextUtils.isEmpty(url)) {
+                        url = DefaultConfig.safeJsonString(item, "api", "");
+                    }
+                } else if (element.isJsonPrimitive()) {
+                    url = element.getAsString();
+                }
+                if (!TextUtils.isEmpty(url)) {
+                    apiLines.add(HistoryHelper.buildApiLine(name, url));
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return apiLines;
+    }
+
+    private String trimJsonObject(String content) {
+        if (content == null) {
+            return "";
+        }
+        String trimContent = content.trim();
+        int start = trimContent.indexOf("{");
+        int end = trimContent.lastIndexOf("}");
+        if (start >= 0 && end > start) {
+            return trimContent.substring(start, end + 1);
+        }
+        return trimContent;
+    }
+
+    private void clearApiLinesIfUnmatched(String apiUrl) {
+        ArrayList<String> apiLines = Hawk.get(HawkConfig.API_LINE_LIST, new ArrayList<String>());
+        if (apiLines.isEmpty()) {
+            return;
+        }
+        for (String apiLine : apiLines) {
+            if (apiUrl.equals(HistoryHelper.getApiLineUrl(apiLine))) {
+                return;
+            }
+        }
+        HistoryHelper.clearApiLineList();
     }
 
     private static  String jarCache ="true";

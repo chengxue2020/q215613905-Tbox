@@ -347,6 +347,7 @@
         android:layout_marginLeft="@dimen/vs_50"
         android:layout_marginTop="@dimen/vs_20"
         android:layout_marginBottom="@dimen/vs_10"
+        android:background="@drawable/preview_player_round"
         android:visibility="gone" />
 
     <View
