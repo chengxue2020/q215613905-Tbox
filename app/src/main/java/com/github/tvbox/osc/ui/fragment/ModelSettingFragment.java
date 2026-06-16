@@ -814,7 +814,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
             public void run() {
                 restartApp();
             }
-        }, 3000);
+        }, 2000);
     }
 
     private void refreshApiLineText() {

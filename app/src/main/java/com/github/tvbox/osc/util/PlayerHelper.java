@@ -293,12 +293,12 @@ public class PlayerHelper {
         long bitSpeed = speed * 8; // 字节转比特
         if (bitSpeed >= 1_000_000_000) {
             return new DecimalFormat("0.00").format(bitSpeed / 1_000_000_000d) + "Gbps";
+        } else if (bitSpeed >= 1_000_000) {
+            return new DecimalFormat("0.0").format(bitSpeed / 1_000_000d) + "Mbps";
         } else if (bitSpeed >= 1_000) {
-            double mbps = bitSpeed / 1_000_000d;
-            DecimalFormat df = mbps < 0.1 ? new DecimalFormat("0.00") : new DecimalFormat("0.0");
-            return df.format(mbps) + "Mbps";
-        }else {
-            return show ? "0bps" : "";
+            return new DecimalFormat("0.0").format(bitSpeed / 1_000d) + "Kbps";
+        } else {
+            return bitSpeed > 0 ? bitSpeed + "bps" : (show ? "0bps" : "");
         }
     }
 }

@@ -130,6 +130,7 @@ public class LivePlayActivity extends BaseActivity {
     private TextView tvChannelInfo;
     private TextView tvTime;
     private TextView tvNetSpeed;
+    private TextView tvResolution;
     private LinearLayout tvLeftChannelListLayout;
     private TvRecyclerView mChannelGroupView;
     private TvRecyclerView mLiveChannelView;
@@ -145,7 +146,13 @@ public class LivePlayActivity extends BaseActivity {
 
     public static  int currentChannelGroupIndex = 0;
     private Handler mHandler = new Handler();
+    private int resolutionInfoRetryCount = 0;
+    private boolean resolutionInfoPending = false;
+    private boolean exitingLivePlay = false;
     private static final long EPG_LOAD_DELAY = 1200L;
+    private static final int RESOLUTION_INFO_MAX_RETRY = 10;
+    private static final long RESOLUTION_INFO_RETRY_DELAY = 300L;
+    private static final long RESOLUTION_INFO_HIDE_DELAY = 3000L;
     private static final String DEFAULT_EPG_ADDRESS = "http://epg.51zmt.top:8000/api/diyp/?ch={name}&date={date}";
     private final Runnable mLoadEpgRun = new Runnable() {
         @Override
@@ -262,6 +269,7 @@ public class LivePlayActivity extends BaseActivity {
         tvChannelInfo = findViewById(R.id.tvChannel);
         tvTime = findViewById(R.id.tvTime);
         tvNetSpeed = findViewById(R.id.tvNetSpeed);
+        tvResolution = findViewById(R.id.tvResolution);
 
         //EPG  findViewById  by 龍
         tip_chname = (TextView)  findViewById(R.id.tv_channel_bar_name);//底部名称
@@ -1104,6 +1112,7 @@ public class LivePlayActivity extends BaseActivity {
         }else {
             mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
             mHandler.removeCallbacks(mUpdateNetSpeedRun);
+            exitingLivePlay = true;
             super.onBackPressed();
         }
     }
@@ -1254,6 +1263,7 @@ public class LivePlayActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        exitingLivePlay = false;
         if (mVideoView != null) {
             mVideoView.resume();
         }
@@ -1263,7 +1273,7 @@ public class LivePlayActivity extends BaseActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        if (mVideoView != null) {
+        if (mVideoView != null && !exitingLivePlay) {
             mVideoView.pause();
         }
     }
@@ -1277,6 +1287,8 @@ public class LivePlayActivity extends BaseActivity {
             mVideoView = null;
         }
         mHandler.removeCallbacks(mLoadEpgRun);
+        mHandler.removeCallbacks(mUpdateResolutionInfoRun);
+        mHandler.removeCallbacks(mHideResolutionInfoRun);
     }
 
     private void showChannelList() {
@@ -1629,6 +1641,7 @@ public class LivePlayActivity extends BaseActivity {
             mVideoView.release();
             mVideoView.setUrl(currentLiveChannelItem.getUrl(),liveWebHeader());
             mVideoView.start();
+            showResolutionAfterChannelSwitch();
         }
         loadEpgAfterChannelStarted();
         return true;
@@ -2130,6 +2143,11 @@ public class LivePlayActivity extends BaseActivity {
                     case VideoView.STATE_PLAYING:
                         // 播放状态：当播放器缓冲完成或正在正常播放时，表明当前源是可用的，
                         hideSwitchChannelSnapshot();
+                        if (resolutionInfoPending) {
+                            resolutionInfoRetryCount = 0;
+                            mHandler.removeCallbacks(mUpdateResolutionInfoRun);
+                            mHandler.post(mUpdateResolutionInfoRun);
+                        }
                         currentLiveChangeSourceTimes = 0;
                         allowLiveSwitchPlayer = true;
                         break;
@@ -2481,10 +2499,15 @@ public class LivePlayActivity extends BaseActivity {
                         showNetSpeed();
                         break;
                     case 2:
+                        select = !Hawk.get(HawkConfig.LIVE_SHOW_RESOLUTION, false);
+                        Hawk.put(HawkConfig.LIVE_SHOW_RESOLUTION, select);
+                        showResolutionSetting();
+                        break;
+                    case 3:
                         select = !Hawk.get(HawkConfig.LIVE_CHANNEL_REVERSE, false);
                         Hawk.put(HawkConfig.LIVE_CHANNEL_REVERSE, select);
                         break;
-                    case 3:
+                    case 4:
                         select = !Hawk.get(HawkConfig.LIVE_CROSS_GROUP, false);
                         Hawk.put(HawkConfig.LIVE_CROSS_GROUP, select);
                         break;
@@ -2708,8 +2731,9 @@ public class LivePlayActivity extends BaseActivity {
         liveSettingGroupList.get(3).getLiveSettingItems().get(Hawk.get(HawkConfig.LIVE_CONNECT_TIMEOUT, 1)).setItemSelected(true);
         liveSettingGroupList.get(4).getLiveSettingItems().get(0).setItemSelected(Hawk.get(HawkConfig.LIVE_SHOW_TIME, false));
         liveSettingGroupList.get(4).getLiveSettingItems().get(1).setItemSelected(Hawk.get(HawkConfig.LIVE_SHOW_NET_SPEED, false));
-        liveSettingGroupList.get(4).getLiveSettingItems().get(2).setItemSelected(Hawk.get(HawkConfig.LIVE_CHANNEL_REVERSE, false));
-        liveSettingGroupList.get(4).getLiveSettingItems().get(3).setItemSelected(Hawk.get(HawkConfig.LIVE_CROSS_GROUP, false));
+        liveSettingGroupList.get(4).getLiveSettingItems().get(2).setItemSelected(Hawk.get(HawkConfig.LIVE_SHOW_RESOLUTION, false));
+        liveSettingGroupList.get(4).getLiveSettingItems().get(3).setItemSelected(Hawk.get(HawkConfig.LIVE_CHANNEL_REVERSE, false));
+        liveSettingGroupList.get(4).getLiveSettingItems().get(4).setItemSelected(Hawk.get(HawkConfig.LIVE_CROSS_GROUP, false));
         liveSettingGroupList.get(5).getLiveSettingItems().get(Hawk.get(HawkConfig.LIVE_GROUP_INDEX, 0)).setItemSelected(true);
     }
 
@@ -2723,6 +2747,81 @@ public class LivePlayActivity extends BaseActivity {
             liveSettingItemList.add(liveSettingItem);
         }
         liveSettingGroupList.get(0).setLiveSettingItems(liveSettingItemList);
+    }
+
+    private void showResolutionAfterChannelSwitch() {
+        resolutionInfoPending = true;
+        resolutionInfoRetryCount = 0;
+        if (tvResolution != null) {
+            tvResolution.setText("");
+            tvResolution.setVisibility(View.GONE);
+        }
+        mHandler.removeCallbacks(mHideResolutionInfoRun);
+        mHandler.removeCallbacks(mUpdateResolutionInfoRun);
+        mHandler.postDelayed(mUpdateResolutionInfoRun, RESOLUTION_INFO_RETRY_DELAY);
+    }
+
+    private void showResolutionSetting() {
+        mHandler.removeCallbacks(mHideResolutionInfoRun);
+        mHandler.removeCallbacks(mUpdateResolutionInfoRun);
+        if (Hawk.get(HawkConfig.LIVE_SHOW_RESOLUTION, false)) {
+            resolutionInfoPending = true;
+            resolutionInfoRetryCount = 0;
+            if (tvResolution != null) {
+                tvResolution.setVisibility(View.GONE);
+                mHandler.postDelayed(mUpdateResolutionInfoRun, RESOLUTION_INFO_RETRY_DELAY);
+            }
+        } else {
+            showResolutionAfterChannelSwitch();
+        }
+    }
+
+    private final Runnable mHideResolutionInfoRun = new Runnable() {
+        @Override
+        public void run() {
+            if (tvResolution != null) {
+                tvResolution.setVisibility(View.GONE);
+            }
+        }
+    };
+
+    private final Runnable mUpdateResolutionInfoRun = new Runnable() {
+        @Override
+        public void run() {
+            if (tvResolution == null || mVideoView == null) {
+                return;
+            }
+            if (mVideoView.getCurrentPlayState() != VideoView.STATE_PREPARED
+                    && mVideoView.getCurrentPlayState() != VideoView.STATE_BUFFERED
+                    && mVideoView.getCurrentPlayState() != VideoView.STATE_PLAYING) {
+                retryOrHideResolutionInfo();
+                return;
+            }
+            int[] videoSize = mVideoView.getVideoSize();
+            if (videoSize != null && videoSize.length >= 2 && videoSize[0] > 0 && videoSize[1] > 0) {
+                updateResolutionText(videoSize[0], videoSize[1]);
+                return;
+            }
+            retryOrHideResolutionInfo();
+        }
+    };
+
+    private void updateResolutionText(int width, int height) {
+        resolutionInfoPending = false;
+        tvResolution.setText("[ " + width + "x" + height + " ]");
+        tvResolution.setVisibility(View.VISIBLE);
+        mHandler.removeCallbacks(mHideResolutionInfoRun);
+        if (!Hawk.get(HawkConfig.LIVE_SHOW_RESOLUTION, false)) {
+            mHandler.postDelayed(mHideResolutionInfoRun, RESOLUTION_INFO_HIDE_DELAY);
+        }
+    }
+
+    private void retryOrHideResolutionInfo() {
+        if (resolutionInfoPending && resolutionInfoRetryCount++ < RESOLUTION_INFO_MAX_RETRY) {
+            mHandler.postDelayed(mUpdateResolutionInfoRun, RESOLUTION_INFO_RETRY_DELAY);
+        } else {
+            tvResolution.setVisibility(View.GONE);
+        }
     }
 
     void showTime() {
@@ -2760,7 +2859,7 @@ public class LivePlayActivity extends BaseActivity {
         @Override
         public void run() {
             if (mVideoView == null) return;
-            String speed = PlayerHelper.getDisplaySpeed(mVideoView.getTcpSpeed(),true);
+            String speed = PlayerHelper.getDisplaySpeedBps(mVideoView.getTcpSpeed(), true);
             tvNetSpeed.setText(speed);
 //            tv_right_top_tipnetspeed.setText(speed);
             mHandler.postDelayed(this, 1000);

@@ -121,8 +121,8 @@ public class PlayFragment extends BaseLazyFragment {
     private static final int MSG_PARSE_TIMEOUT = 100;
     private static final int MSG_RESOLVE_PLAY_URL_TIMEOUT = 101;
     private static final int MSG_SWITCH_LINE_PLAY_TIMEOUT = 102;
-    private static final long RESOLVE_PLAY_URL_TIMEOUT_MS = 8 * 1000L;
-    private static final long SWITCH_LINE_PLAY_TIMEOUT_MS = 8 * 1000L;
+    private static final long RESOLVE_PLAY_URL_TIMEOUT_MS = 10 * 1000L;
+    private static final long SWITCH_LINE_PLAY_TIMEOUT_MS = 10 * 1000L;
     private MyVideoView mVideoView;
     private TextView mPlayLoadTip;
     private ImageView mPlayLoadErr;
@@ -130,6 +130,7 @@ public class PlayFragment extends BaseLazyFragment {
     private VodController mController;
     private SourceViewModel sourceViewModel;
     private Handler mHandler;
+    private boolean exitingPreview = false;
 
     private final long videoDuration = -1;
 
@@ -883,6 +884,10 @@ public class PlayFragment extends BaseLazyFragment {
         return false;
     }
 
+    public void setExitingPreview(boolean exitingPreview) {
+        this.exitingPreview = exitingPreview;
+    }
+
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (event != null) {
             if (mController.onKeyEvent(event)) {
@@ -913,7 +918,7 @@ public class PlayFragment extends BaseLazyFragment {
     @Override
     public void onPause() {
         super.onPause();
-        if (mVideoView != null) {
+        if (mVideoView != null && !exitingPreview) {
             mVideoView.pause();
         }
     }
@@ -921,6 +926,7 @@ public class PlayFragment extends BaseLazyFragment {
     @Override
     public void onResume() {
         super.onResume();
+        exitingPreview = false;
         if (mVideoView != null) {
             mVideoView.resume();
         }

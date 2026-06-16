@@ -1199,7 +1199,10 @@ public class DetailActivity extends BaseActivity {
                 return;
             }
         }
-        if(showPreview && playFragment!=null)playFragment.setPlayTitle(false);
+        if(showPreview && playFragment!=null){
+            playFragment.setPlayTitle(false);
+            playFragment.setExitingPreview(true);
+        }
         super.onBackPressed();
     }
 
