@@ -10,7 +10,7 @@
         android:layout_width="@dimen/vs_480"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:background="@drawable/shape_dialog_bg_main">
+        android:background="@drawable/shape_danmu_setting_bg">
 
         <TextView
             android:id="@+id/title"
@@ -21,7 +21,8 @@
             android:padding="@dimen/vs_20"
             android:singleLine="true"
             android:text="11111111"
-            android:textColor="@color/color_CC000000"
+            android:textColor="@color/dialog_text_primary"
+            android:textStyle="bold"
             android:textSize="@dimen/ts_24"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"

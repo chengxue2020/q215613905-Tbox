@@ -9,7 +9,7 @@
         android:layout_width="@dimen/vs_480"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:background="@drawable/shape_dialog_bg_main">
+        android:background="@drawable/shape_danmu_setting_bg">
 
         <TextView
             android:id="@+id/title"
@@ -24,7 +24,7 @@
             android:shadowRadius="5"
             android:singleLine="true"
             android:text="备份 | 还原"
-            android:textColor="@color/color_6632364E"
+            android:textColor="@color/dialog_text_primary"
             android:textSize="@dimen/ts_26"
             android:textStyle="bold"
             app:layout_constraintLeft_toLeftOf="parent"
@@ -49,12 +49,12 @@
                 android:layout_marginEnd="@dimen/vs_5"
                 android:layout_marginRight="@dimen/vs_5"
                 android:layout_weight="1"
-                android:background="@drawable/button_dialog_main"
+                android:background="@drawable/button_danmu_setting"
                 android:focusable="true"
                 android:gravity="center"
                 android:padding="@dimen/vs_10"
                 android:text="立即备份"
-                android:textColor="@color/color_FFFFFF"
+                android:textColor="@color/dialog_text_primary"
                 android:textSize="@dimen/ts_22" />
 
             <TextView
@@ -65,12 +65,12 @@
                 android:layout_marginStart="@dimen/vs_5"
                 android:layout_marginLeft="@dimen/vs_5"
                 android:layout_weight="1"
-                android:background="@drawable/button_dialog_main"
+                android:background="@drawable/button_danmu_setting"
                 android:focusable="true"
                 android:gravity="center"
                 android:padding="@dimen/vs_10"
                 android:text="存储权限"
-                android:textColor="@color/color_FFFFFF"
+                android:textColor="@color/dialog_text_primary"
                 android:textSize="@dimen/ts_22" />
         </LinearLayout>
 
@@ -87,7 +87,7 @@
             android:shadowRadius="5"
             android:singleLine="true"
             android:text="点击下方按钮操作"
-            android:textColor="@color/color_6632364E"
+            android:textColor="@color/dialog_text_primary"
             android:textSize="@dimen/ts_26"
             android:textStyle="bold"
             app:layout_constraintLeft_toLeftOf="parent"

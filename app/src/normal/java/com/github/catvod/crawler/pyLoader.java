@@ -19,7 +19,7 @@ public class pyLoader implements IPyLoader {
     }
 
     @Override
-    public void setRecentPyKey(String pyApi) {
+    public void setRecentPyKey(String key) {
         Log.i("PyLoader", "java flavor: setRecentPyKey() called, Python is not supported.");
     }
 
@@ -32,6 +32,12 @@ public class pyLoader implements IPyLoader {
     @Override
     public Object[] proxyInvoke(Map<String, String> params) {
         Log.i("PyLoader", "java flavor: proxyInvoke(params) called, Python is not supported.");
+        return null;
+    }
+
+    @Override
+    public Object[] proxyInvoke(Map<String, String> params, String key) {
+        Log.i("PyLoader", "java flavor: proxyInvoke(params, key) called, Python is not supported.");
         return null;
     }
 }

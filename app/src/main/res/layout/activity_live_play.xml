@@ -29,9 +29,12 @@
 			android:visibility="gone" />
 
 		<ProgressBar
-			android:layout_width="56dp"
-			android:layout_height="56dp"
+			style="?android:attr/progressBarStyleSmall"
+			android:layout_width="45dp"
+			android:layout_height="45dp"
 			android:layout_gravity="center"
+			android:scaleX="0.75"
+			android:scaleY="0.75"
 			android:indeterminate="true" />
 	</FrameLayout>
 

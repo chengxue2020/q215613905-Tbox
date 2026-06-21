@@ -2,12 +2,12 @@ package com.github.tvbox.osc.ui.dialog;
 
 import android.content.Context;
 import android.content.DialogInterface;
-import android.graphics.Color;
 import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
@@ -48,7 +48,7 @@ public class XWalkInitDialog extends BaseDialog {
 
             private void setTextEnable(boolean enable) {
                 downText.setEnabled(enable);
-                downText.setTextColor(enable ? Color.BLACK : Color.GRAY);
+                downText.setTextColor(ContextCompat.getColor(context, enable ? R.color.dialog_text_primary : R.color.dialog_text_hint));
             }
 
             @Override

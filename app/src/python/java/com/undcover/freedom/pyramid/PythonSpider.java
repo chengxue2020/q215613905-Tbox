@@ -159,7 +159,7 @@ public class PythonSpider extends Spider {
     }
 
     public Object[] proxyLocal(Map<String,String> params) {
-        Log.i("PyLoader","echo-proxyLocal:param"+params.toString());
+//        Log.i("PyLoader","echo-proxyLocal:param"+params.toString());
         List<PyObject> list = app.callAttr("localProxy", pySpider, map2json(params).toString()).asList();
         boolean base64 = list.size() > 4 && list.get(4).toInt() == 1;
         boolean headerAvailable = list.size() > 3 && list.get(3) != null;

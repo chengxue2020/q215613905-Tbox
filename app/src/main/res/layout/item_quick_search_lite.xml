@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/button_dialog_main"
+    android:background="@drawable/button_danmu_setting"
     android:focusable="true">
 
     <TextView
@@ -13,6 +13,6 @@
         android:gravity="center_vertical"
         android:padding="@dimen/vs_10"
         android:singleLine="true"
-        android:textColor="@color/color_FFFFFF"
+        android:textColor="@color/dialog_text_primary"
         android:textSize="@dimen/ts_20" />
 </FrameLayout>

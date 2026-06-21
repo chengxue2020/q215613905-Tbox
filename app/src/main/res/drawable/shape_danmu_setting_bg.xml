@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <corners android:radius="@dimen/vs_10" />
+    <solid android:color="@color/dialog_panel_bg" />
+    <stroke
+        android:width="@dimen/vs_1"
+        android:color="@color/dialog_panel_stroke" />
+</shape>

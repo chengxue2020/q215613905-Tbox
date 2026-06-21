@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Typeface;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.TypedValue;
@@ -83,7 +84,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class SearchActivity extends BaseActivity {
     private static final String HOT_SEARCH_URL = "https://movie.douban.com/j/search_subjects?type=tv&tag=%E7%83%AD%E9%97%A8&sort=recommend&page_limit=20&page_start=0";
     private static final int SEARCH_THREAD_COUNT = 6;
-    private static final int SEARCH_MAX_THREAD_COUNT = 18;
+    private static final int SEARCH_MAX_THREAD_COUNT = Build.VERSION.SDK_INT >= 30 ? 18 : 12;
     private static final int SEARCH_NEXT_BATCH_SECONDS = 3;
     private static final int SEARCH_SITE_TIMEOUT_SECONDS = 10;
     private static final String[] DEFAULT_HOT_WORDS = {
@@ -146,15 +147,7 @@ public class SearchActivity extends BaseActivity {
         if (searchPaused) {
             resumePausedSearches();
         }
-        if (hasKeyBoard) {
-            tvSearch.requestFocus();
-            tvSearch.requestFocusFromTouch();
-        }else {
-            if(!isSearchBack){
-                etSearch.requestFocus();
-                etSearch.requestFocusFromTouch();
-            }
-        }
+        requestSearchFocusWhenReady();
         applySearchWordMode();
         if (aggregateSearchMode) {
             refreshSearchHistoryWords();
@@ -162,6 +155,19 @@ public class SearchActivity extends BaseActivity {
                 hotWordAdapter.setNewData(hots);
             }
         }
+    }
+
+    private void requestSearchFocusWhenReady() {
+        final View focusView = hasKeyBoard || isSearchBack ? tvSearch : etSearch;
+        if (focusView == null) return;
+        focusView.post(new Runnable() {
+            @Override
+            public void run() {
+                if (isFinishing()) return;
+                focusView.requestFocus();
+                focusView.requestFocusFromTouch();
+            }
+        });
     }
 
     private void initView() {
@@ -215,6 +221,8 @@ public class SearchActivity extends BaseActivity {
                     Bundle bundle = new Bundle();
                     bundle.putString("id", video.id);
                     bundle.putString("sourceKey", video.sourceKey);
+                    bundle.putString("title", video.name);
+                    bundle.putString("picture", video.pic);
                     jumpActivity(DetailActivity.class, bundle);
                 }
             }
@@ -398,14 +406,18 @@ public class SearchActivity extends BaseActivity {
         wordsSwitch.setText("热  门");
         wordsSwitch.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(R.dimen.ts_22));
         wordsSwitch.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        wordsSwitch.setLetterSpacing(0.08f);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            wordsSwitch.setLetterSpacing(0.08f);
+        }
     }
 
     private void setNormalWordTitle() {
         wordsSwitch.setText("热词 | 历史");
         wordsSwitch.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(R.dimen.ts_20));
         wordsSwitch.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
-        wordsSwitch.setLetterSpacing(0f);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            wordsSwitch.setLetterSpacing(0f);
+        }
     }
 
     private void applySearchWordMode() {

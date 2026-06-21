@@ -10,7 +10,6 @@ import androidx.core.content.ContextCompat;
 import com.github.catvod.crawler.python.IPyLoader;
 import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.util.LOG;
-import com.github.tvbox.osc.util.MD5;
 import com.undcover.freedom.pyramid.PythonLoader;
 import com.undcover.freedom.pyramid.PythonSpider;
 import java.io.UnsupportedEncodingException;
@@ -32,6 +31,7 @@ public class pyLoader implements IPyLoader {
         spiders.clear();
         pythonLoader.clear();
         lastConfig = null;
+        recentPyKey = null;
     }
 
     @Override
@@ -43,10 +43,10 @@ public class pyLoader implements IPyLoader {
         }
     }
 
-    private String recentPyApi;
+    private String recentPyKey;
     @Override
-    public void setRecentPyKey(String pyApi) {
-        recentPyApi = pyApi;
+    public void setRecentPyKey(String key) {
+        recentPyKey = key;
     }
 
     @Override
@@ -74,10 +74,17 @@ public class pyLoader implements IPyLoader {
 
     @Override
     public Object[] proxyInvoke(Map<String, String> params){
-        if(recentPyApi==null)return null;
-        LOG.i("echo-recentPyApi" + recentPyApi);
+        return proxyInvoke(params, recentPyKey);
+    }
+
+    @Override
+    public Object[] proxyInvoke(Map<String, String> params, String key){
+        if(key==null || key.isEmpty())return null;
+        LOG.i("echo-recentPyKey" + key);
         try {
-            PythonSpider originalSpider = (PythonSpider) getSpider(MD5.string2MD5(recentPyApi), recentPyApi,"");
+            Spider spider = spiders.get(key);
+            if (!(spider instanceof PythonSpider)) return null;
+            PythonSpider originalSpider = (PythonSpider) spider;
             return originalSpider.proxyLocal(params);
         } catch (Throwable th) {
             LOG.i("echo-proxyInvoke_Throwable:---" + th.getMessage());

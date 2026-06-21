@@ -13,7 +13,7 @@ import com.github.tvbox.osc.R;
 import java.util.ArrayList;
 
 public class FastListAdapter extends BaseQuickAdapter<String, BaseViewHolder> {
-    private String selectedName = "全部";
+    private String selectedName = "\u5168\u90e8";
 
     public FastListAdapter() {
         super(R.layout.item_search_word_hot, new ArrayList<>());
@@ -22,55 +22,28 @@ public class FastListAdapter extends BaseQuickAdapter<String, BaseViewHolder> {
     @Override
     protected void convert(BaseViewHolder helper, String item) {
         TextView textView = helper.getView(R.id.tvSearchWord);
-        boolean selected = TextUtils.equals(item, selectedName);
         textView.setText(item);
-        textView.setSelected(selected);
         textView.setBackgroundResource(R.drawable.bg_fast_site_word);
-        textView.setTypeface(Typeface.DEFAULT, selected ? Typeface.BOLD : Typeface.NORMAL);
+        updateSelection(textView, item);
     }
 
     public void setSelectedName(String selectedName) {
-        this.selectedName = TextUtils.isEmpty(selectedName) ? "全部" : selectedName;
-        notifyDataSetChanged();
+        this.selectedName = TextUtils.isEmpty(selectedName) ? "\u5168\u90e8" : selectedName;
     }
 
-    // 记录失去焦点的控件
-    public void onLostFocus(View child) {
-        if(lostFocusTimestamp==0) {
-            lostFocusTimestamp = System.currentTimeMillis();
-        }
-    }
-
-    // 记录获得焦点的控件
-    public int onSetFocus(View child){
-        // 可以调整间隔还判断到底是不是整个view失去了焦点
-        if(System.currentTimeMillis() - lostFocusTimestamp > 200) {
-            setp = 0;
-        }
-        int index=((ViewGroup)child.getParent()).indexOfChild(child);
-        if(focusView != null){
-            int index2=((ViewGroup)focusView.getParent()).indexOfChild(focusView);
-            if(Math.abs(index-index2) > setp) { // 跳了控件，将焦点恢复到之前的控件上去
-                setp = 0;
-                int offset = (index > index2? -1 :1);
-                ViewGroup parent =  ((ViewGroup)focusView.getParent());
-                parent.getChildAt(index+offset).requestFocus();
-                return  -1;
+    public void refreshVisibleSelection(ViewGroup parent) {
+        if (parent == null) return;
+        for (int i = 0; i < parent.getChildCount(); i++) {
+            View child = parent.getChildAt(i);
+            if (child instanceof TextView) {
+                updateSelection((TextView) child, ((TextView) child).getText().toString());
             }
         }
-        lostFocusTimestamp =0;
-        focusView = child;
-        setp =1;
-        return 1;
     }
 
-    public void  reset(){
-        lostFocusTimestamp =0;
-        setp =0;
-        focusView = null;
+    private void updateSelection(TextView textView, String item) {
+        boolean selected = TextUtils.equals(item, selectedName);
+        textView.setSelected(selected);
+        textView.setTypeface(Typeface.DEFAULT, selected ? Typeface.BOLD : Typeface.NORMAL);
     }
-
-    public long lostFocusTimestamp=0;   // 控件失去焦点的时间
-    public int setp =0; //步长
-    View focusView;     // 当前获得焦点的控件
 }

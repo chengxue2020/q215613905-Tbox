@@ -104,10 +104,12 @@ public class AbsJson implements Serializable {
         public String vod_weekday; //: ""
         public String vod_writer; //: "周炎青,刘恒,支雅雪,孙露军,李璐,王梦璇"
         public String vod_year; //: "2021"
+        public String action;
 
         public Movie.Video toXmlVideo() {
             Movie.Video video = new Movie.Video();
             video.tag = vod_tag;
+            video.action = action;
             video.last = vod_time;
             video.id = vod_id;
             video.tid = type_id;

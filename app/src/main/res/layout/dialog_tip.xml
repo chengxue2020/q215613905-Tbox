@@ -8,7 +8,7 @@
         android:layout_width="@dimen/vs_440"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:background="@drawable/shape_dialog_bg_main"
+        android:background="@drawable/shape_danmu_setting_bg"
         android:orientation="vertical"
         android:padding="@dimen/vs_30">
 
@@ -21,7 +21,7 @@
             android:lineSpacingExtra="@dimen/ts_50"
             android:lineSpacingMultiplier="0"
             android:textAlignment="gravity"
-            android:textColor="@color/color_CC000000"
+            android:textColor="@color/dialog_text_primary"
             android:textSize="@dimen/ts_24"
             tools:text="1111111111111111111111111111111111111111111111111111" />
 
@@ -39,12 +39,12 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:layout_marginRight="@dimen/vs_5"
-                android:background="@drawable/button_dialog_main"
+                android:background="@drawable/button_danmu_setting"
                 android:focusable="true"
                 android:gravity="center"
                 android:padding="@dimen/vs_10"
-                android:text="确定"
-                android:textColor="@color/color_FFFFFF"
+                android:text="纭畾"
+                android:textColor="@color/dialog_text_primary"
                 android:textSize="@dimen/ts_22" />
 
             <TextView
@@ -53,12 +53,12 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:layout_marginLeft="@dimen/vs_5"
-                android:background="@drawable/button_dialog_main"
+                android:background="@drawable/button_danmu_setting"
                 android:focusable="true"
                 android:gravity="center"
                 android:padding="@dimen/vs_10"
-                android:text="取消"
-                android:textColor="@color/color_FFFFFF"
+                android:text="鍙栨秷"
+                android:textColor="@color/dialog_text_primary"
                 android:textSize="@dimen/ts_22" />
         </LinearLayout>
 

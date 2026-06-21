@@ -35,6 +35,8 @@
             android:layout_height="@dimen/vs_50"
             android:clipChildren="false"
             android:clipToPadding="false"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
             app:tv_horizontalSpacingWithMargins="@dimen/vs_5"
             app:tv_selectedItemIsCentered="true"
             app:tv_verticalSpacingWithMargins="@dimen/vs_5" />

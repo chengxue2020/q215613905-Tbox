@@ -27,8 +27,8 @@ public class HistoryHelper {
         ArrayList<String> history = Hawk.get(HawkConfig.SEARCH_HISTORY, new ArrayList<String>());
         history.remove(title);
         history.add(0, title);
-        // 保证最多只保留 15 条，超过的就删除最后一条
-        if (history.size() > 15) {
+        // 保证最多只保留 20 条，超过的就删除最后一条
+        if (history.size() > 20) {
             history.remove(history.size() - 1);
         }
         Hawk.put(HawkConfig.SEARCH_HISTORY, history);

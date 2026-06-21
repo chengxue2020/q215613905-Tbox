@@ -2,6 +2,7 @@ package com.github.tvbox.osc.ui.activity;
 
 import android.content.Intent;
 import android.graphics.Typeface;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Looper;
 import android.text.SpannableString;
@@ -13,11 +14,8 @@ import android.text.style.StyleSpan;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.lifecycle.ViewModelProvider;
-import androidx.recyclerview.widget.RecyclerView;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.github.catvod.crawler.JsLoader;
@@ -67,10 +65,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class FastSearchActivity extends BaseActivity {
     private static final int SEARCH_THREAD_COUNT = 6;
-    private static final int SEARCH_MAX_THREAD_COUNT = 18;
+    private static final int SEARCH_MAX_THREAD_COUNT = Build.VERSION.SDK_INT >= 30 ? 18 : 12;
     private static final int SEARCH_PUMP_SECONDS = 2;
     private static final int SEARCH_NEXT_BATCH_SECONDS = 3;
     private static final int SEARCH_SITE_TIMEOUT_SECONDS = 10;
+    private static final String SEARCH_ALL_NAME = "\u5168\u90e8";
     private LinearLayout llLayout;
     private TextView mSearchTitle;
     private TvRecyclerView mGridView;
@@ -89,27 +88,10 @@ public class FastSearchActivity extends BaseActivity {
     private String searchFilterKey = "";    // 过滤的key
     private HashMap<String, ArrayList<Movie.Video>> resultVods; // 搜索结果
     private final List<String> quickSearchWord = new ArrayList<>();
+    private final Set<String> wordListNames = new HashSet<>();
+    private int wordListVersion = 0;
+    private String selectedWordName = "";
     private HashMap<String, String> mCheckSources = null;
-
-    private final View.OnFocusChangeListener focusChangeListener = new View.OnFocusChangeListener() {
-        @Override
-        public void onFocusChange(View itemView, boolean hasFocus) {
-            try {
-                if (!hasFocus) {
-                    spListAdapter.onLostFocus(itemView);
-                } else {
-                    int ret = spListAdapter.onSetFocus(itemView);
-                    if (ret < 0) return;
-                    TextView v = (TextView) itemView;
-                    String sb = v.getText().toString();
-                    filterResult(sb);
-                }
-            } catch (Exception e) {
-                Toast.makeText(FastSearchActivity.this, e.toString(), Toast.LENGTH_SHORT).show();
-            }
-
-        }
-    };
 
     @Override
     protected int getLayoutResID() {
@@ -146,28 +128,32 @@ public class FastSearchActivity extends BaseActivity {
         spListAdapter = new FastListAdapter();
         mGridViewWord.setAdapter(spListAdapter);
 
-        mGridViewWord.addOnChildAttachStateChangeListener(new RecyclerView.OnChildAttachStateChangeListener() {
-            @Override
-            public void onChildViewAttachedToWindow(@NonNull View child) {
-                child.setFocusable(true);
-                child.setOnFocusChangeListener(focusChangeListener);
-                TextView t = (TextView) child;
-                if (TextUtils.equals(t.getText(), "全部")) {
-                    t.requestFocus();
-                }
-            }
-
-            @Override
-            public void onChildViewDetachedFromWindow(@NonNull View view) {
-                view.setOnFocusChangeListener(null);
-            }
-        });
-
         spListAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
             @Override
             public void onItemClick(BaseQuickAdapter adapter, View view, int position) {
-                String spName = spListAdapter.getItem(position);
-                filterResult(spName);
+                selectWord(spListAdapter.getItem(position));
+            }
+        });
+
+        mGridViewWord.setOnItemListener(new TvRecyclerView.OnItemListener() {
+            @Override
+            public void onItemPreSelected(TvRecyclerView parent, View itemView, int position) {
+            }
+
+            @Override
+            public void onItemSelected(TvRecyclerView parent, View itemView, int position) {
+                selectWord(spListAdapter.getItem(position));
+            }
+
+            @Override
+            public void onItemClick(TvRecyclerView parent, View itemView, int position) {
+                selectWord(spListAdapter.getItem(position));
+            }
+        });
+        mGridViewWord.setOnInBorderKeyEventListener(new TvRecyclerView.OnInBorderKeyEventListener() {
+            @Override
+            public boolean onInBorderKeyEvent(int direction, View view) {
+                return direction == View.FOCUS_UP;
             }
         });
 
@@ -187,6 +173,8 @@ public class FastSearchActivity extends BaseActivity {
                     Bundle bundle = new Bundle();
                     bundle.putString("id", video.id);
                     bundle.putString("sourceKey", video.sourceKey);
+                    bundle.putString("title", video.name);
+                    bundle.putString("picture", video.pic);
                     jumpActivity(DetailActivity.class, bundle);
                 }
             }
@@ -206,6 +194,8 @@ public class FastSearchActivity extends BaseActivity {
                     Bundle bundle = new Bundle();
                     bundle.putString("id", video.id);
                     bundle.putString("sourceKey", video.sourceKey);
+                    bundle.putString("title", video.name);
+                    bundle.putString("picture", video.pic);
                     jumpActivity(DetailActivity.class, bundle);
                 }
             }
@@ -233,8 +223,10 @@ public class FastSearchActivity extends BaseActivity {
     }
 
     private void filterResult(String spName) {
-        spListAdapter.setSelectedName(spName);
-        if (TextUtils.equals(spName, "全部")) {
+        if (TextUtils.isEmpty(spName)) return;
+        selectedWordName = spName;
+        setSelectedWordName(spName);
+        if (TextUtils.equals(spName, SEARCH_ALL_NAME)) {
             mGridView.setVisibility(View.VISIBLE);
             mGridViewFilter.setVisibility(View.GONE);
             return;
@@ -252,6 +244,94 @@ public class FastSearchActivity extends BaseActivity {
             list = new ArrayList<>();
         }
         searchAdapterFilter.setNewData(list);
+    }
+
+    private void selectWord(String spName) {
+        if (TextUtils.isEmpty(spName) || TextUtils.equals(selectedWordName, spName)) return;
+        filterResult(spName);
+    }
+
+    private void updateWordListWhenIdle(final Runnable action) {
+        if (action == null) return;
+        if (mGridViewWord == null) {
+            action.run();
+            return;
+        }
+        if (mGridViewWord.isComputingLayout()) {
+            mGridViewWord.post(new Runnable() {
+                @Override
+                public void run() {
+                    updateWordListWhenIdle(action);
+                }
+            });
+            return;
+        }
+        action.run();
+    }
+
+    private void setSelectedWordName(final String spName) {
+        updateWordListWhenIdle(new Runnable() {
+            @Override
+            public void run() {
+                spListAdapter.setSelectedName(spName);
+                spListAdapter.refreshVisibleSelection(mGridViewWord);
+            }
+        });
+    }
+
+    private void setWordListData(List<String> data) {
+        final List<String> wordList = new ArrayList<>(data);
+        final int version = ++wordListVersion;
+        wordListNames.clear();
+        wordListNames.addAll(wordList);
+        updateWordListWhenIdle(new Runnable() {
+            @Override
+            public void run() {
+                if (version != wordListVersion) return;
+                spListAdapter.setNewData(wordList);
+                if (wordList.size() > 0 && TextUtils.equals(wordList.get(0), SEARCH_ALL_NAME)) {
+                    mGridViewWord.setSelectedPosition(0);
+                    mGridViewWord.setSelection(0);
+                    requestWordListFirstFocus();
+                }
+            }
+        });
+    }
+
+    private void requestWordListFirstFocus() {
+        if (mGridViewWord == null) return;
+        mGridViewWord.post(new Runnable() {
+            @Override
+            public void run() {
+                if (isFinishing() || mGridViewWord == null) return;
+                mGridViewWord.setSelectedPosition(0);
+                mGridViewWord.setSelection(0);
+                View firstChild = mGridViewWord.getChildAt(0);
+                if (firstChild != null) {
+                    firstChild.requestFocus();
+                } else {
+                    mGridViewWord.requestFocus();
+                }
+            }
+        });
+    }
+
+    private void addWordListDataIfAbsent(final String name) {
+        if (TextUtils.isEmpty(name) || !wordListNames.add(name)) return;
+        final int version = wordListVersion;
+        updateWordListWhenIdle(new Runnable() {
+            @Override
+            public void run() {
+                if (version != wordListVersion) return;
+                List<String> names = spListAdapter.getData();
+                for (int i = 0; i < names.size(); ++i) {
+                    if (TextUtils.equals(name, names.get(i))) {
+                        return;
+                    }
+                }
+                spListAdapter.addData(name);
+            }
+        });
     }
 
     private void fenci() {
@@ -345,8 +425,8 @@ public class FastSearchActivity extends BaseActivity {
         searchAdapter.setNewData(new ArrayList<>());
         searchAdapterFilter.setNewData(new ArrayList<>());
 
-        spListAdapter.reset();
-        spListAdapter.setSelectedName("全部");
+        selectedWordName = "";
+        filterResult(SEARCH_ALL_NAME);
         resultVods.clear();
         searchFilterKey = "";
         isFilterMode = false;
@@ -411,9 +491,9 @@ public class FastSearchActivity extends BaseActivity {
         ArrayList<SearchTask> fastSearchTasks = new ArrayList<>();
         ArrayList<SearchTask> blockingSearchTasks = new ArrayList<>();
         ArrayList<String> hots = new ArrayList<>();
+        hots.add(SEARCH_ALL_NAME);
 
-        spListAdapter.setNewData(hots);
-        spListAdapter.addData("全部");
+        setWordListData(hots);
         for (SourceBean bean : searchRequestList) {
             if (!bean.isSearchable()) {
                 continue;
@@ -463,14 +543,7 @@ public class FastSearchActivity extends BaseActivity {
             }
             if (TextUtils.isEmpty(name)) return key;
 
-            List<String> names = spListAdapter.getData();
-            for (int i = 0; i < names.size(); ++i) {
-                if (TextUtils.equals(name, names.get(i))) {
-                    return key;
-                }
-            }
-
-            spListAdapter.addData(name);
+            addWordListDataIfAbsent(name);
             return key;
         } catch (Exception e) {
             return key;

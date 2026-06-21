@@ -39,6 +39,17 @@
     <color name="color_scrollview_bg">#44000000</color>
     <color name="color_text_primary">#FFFFFAE0</color>
 
+    <!-- Unified dialog palette. Change these to update dialog surfaces globally. -->
+    <color name="dialog_panel_bg">#D91D202A</color>
+    <color name="dialog_panel_stroke">#33FFFFFF</color>
+    <color name="dialog_control_bg">#80353744</color>
+    <color name="dialog_control_bg_focused">#CC1890FF</color>
+    <color name="dialog_control_stroke">#22FFFFFF</color>
+    <color name="dialog_control_stroke_focused">#CC02F8E1</color>
+    <color name="dialog_input_bg">#66353744</color>
+    <color name="dialog_text_primary">#FFFFFFFF</color>
+    <color name="dialog_text_hint">#80FFFFFF</color>
+
 
 
 </resources>

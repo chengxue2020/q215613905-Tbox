@@ -75,7 +75,10 @@ public class ApiConfig {
     private Map<String,String> myHosts;
     private List<IJKCode> ijkCodes;
     private String spider = null;
+    private String currentPyKey = "";
+    private String currentLivePyKey = "";
     public String wallpaper = "";
+    private String danmaku = "";
 
     private final SourceBean emptyHome = new SourceBean();
 
@@ -115,13 +118,15 @@ public class ApiConfig {
         String content = json;
         try {
             if (AES.isJson(content)) return content;
-            Pattern pattern = getPattern("[A-Za-z0]{8}\\*\\*");
+            Pattern pattern = getPattern("[A-Za-z0-9]{8}\\*\\*");
             Matcher matcher = pattern.matcher(content);
             if(matcher.find()){
                 content=content.substring(content.indexOf(matcher.group()) + 10);
                 content = new String(Base64.decode(content, Base64.DEFAULT));
             }
+            content = content.trim();
             if (content.startsWith("2423")) {
+                content = content.replaceAll("\\s+", "");
                 String data = content.substring(content.indexOf("2324") + 4, content.length() - 26);
                 content = new String(AES.toBytes(content)).toLowerCase();
                 String key = AES.rightPadding(content.substring(content.indexOf("$#") + 2, content.indexOf("#$")), "0", 16);
@@ -140,7 +145,7 @@ public class ApiConfig {
     }
 
     private static byte[] getImgJar(String body){
-        Pattern pattern = getPattern("[A-Za-z0]{8}\\*\\*");
+        Pattern pattern = getPattern("[A-Za-z0-9]{8}\\*\\*");
         Matcher matcher = pattern.matcher(body);
         if(matcher.find()){
             body = body.substring(body.indexOf(matcher.group()) + 10);
@@ -275,7 +280,7 @@ public class ApiConfig {
                     public void onSuccess(Response<String> response) {
                         try {
                             String json = response.body();
-//                            LOG.i("echo-ConfigJson"+json);
+                            LOG.i("echo-ConfigJson"+json);
                             if (switchApiCollectionIfNeeded(apiUrl, json)) {
                                 FileUtils.saveCache(cache,json);
                                 loadConfig(false, callback, activity);
@@ -534,6 +539,7 @@ public class ApiConfig {
         // spider
         spider = DefaultConfig.safeJsonString(infoJson, "spider", "");
         jarCache = DefaultConfig.safeJsonString(infoJson, "jarCache", "true");
+        danmaku = DefaultConfig.safeJsonString(infoJson, "danmaku", "");
         // wallpaper
         wallpaper = DefaultConfig.safeJsonString(infoJson, "wallpaper", "");
         // 远端站点源
@@ -923,6 +929,8 @@ public class ApiConfig {
     public void loadLiveApi(JsonObject livesOBJ) {
         try {
             LOG.i("echo-loadLiveApi");
+            currentLiveSpider = "";
+            currentLivePyKey = "";
             String lives = livesOBJ.toString();
             int index = lives.indexOf("proxy://");
             String url;
@@ -966,12 +974,20 @@ public class ApiConfig {
                                 ext=DefaultConfig.safeJsonString(livesOBJ, "ext", "");
                             }
 
-                            pyLoader.getSpider(MD5.string2MD5(pyApi),pyApi,ext);
+                            currentLivePyKey = MD5.string2MD5(pyApi);
+                            currentLiveSpider = pyApi;
+                            pyLoader.getSpider(currentLivePyKey,pyApi,ext);
                         }
                         if(!jarUrl.isEmpty()){
                             jarLoader.loadLiveJar(jarUrl);
+                            if (TextUtils.isEmpty(currentLiveSpider)) {
+                                currentLiveSpider = jarUrl;
+                            }
                         }else if(!liveSpider.isEmpty()){
                             jarLoader.loadLiveJar(liveSpider);
+                            if (TextUtils.isEmpty(currentLiveSpider)) {
+                                currentLiveSpider = liveSpider;
+                            }
                         }
                     }
                 }else {
@@ -1022,7 +1038,9 @@ public class ApiConfig {
     public void setLiveJar(String liveJar)
     {
         if(liveJar.contains(".py")){
-           pyLoader.setRecentPyKey(liveJar);
+            currentLivePyKey = MD5.string2MD5(liveJar);
+            pyLoader.getSpider(currentLivePyKey, liveJar, "");
+            pyLoader.setRecentPyKey(currentLivePyKey);
         }else {
             String jarUrl=!liveJar.isEmpty()?liveJar:liveSpider;
             jarLoader.setRecentJarKey(MD5.string2MD5(jarUrl));
@@ -1034,32 +1052,62 @@ public class ApiConfig {
         return spider;
     }
 
+    public String getDanmaku() {
+        return danmaku == null ? "" : danmaku;
+    }
+
     public Spider getCSP(SourceBean sourceBean) {
         if (sourceBean.getApi().endsWith(".js") || sourceBean.getApi().contains(".js?")){
+            currentPyKey = "";
             return jsLoader.getSpider(sourceBean.getKey(), sourceBean.getApi(), sourceBean.getExt(), sourceBean.getJar());
         }
         else if (sourceBean.getApi().contains(".py")) {
+            currentPyKey = sourceBean.getKey();
+            pyLoader.setRecentPyKey(currentPyKey);
             return pyLoader.getSpider(sourceBean.getKey(), sourceBean.getApi(), sourceBean.getExt());
         }
-        else return jarLoader.getSpider(sourceBean.getKey(), sourceBean.getApi(), sourceBean.getExt(), sourceBean.getJar());
+        else {
+            currentPyKey = "";
+            return jarLoader.getSpider(sourceBean.getKey(), sourceBean.getApi(), sourceBean.getExt(), sourceBean.getJar());
+        }
     }
 
     public Spider getPyCSP(String url) {
-        return pyLoader.getSpider(MD5.string2MD5(url), url, "");
+        currentLivePyKey = MD5.string2MD5(url);
+        currentLiveSpider = url;
+        return pyLoader.getSpider(currentLivePyKey, url, "");
     }
 
     public Object[] proxyLocal(Map<String, String> param) {
         if ("js".equals(param.get("do"))) {
             return jsLoader.proxyInvoke(param);
         }
-        String apiString;
         if (Hawk.get(HawkConfig.PLAYER_IS_LIVE, false)) {
-            apiString = currentLiveSpider!=null?currentLiveSpider:"";
-        } else {
-            SourceBean sourceBean = ApiConfig.get().getHomeSourceBean();
-            apiString = sourceBean.getApi();
+            String liveApi = currentLiveSpider != null ? currentLiveSpider : "";
+            if (liveApi.contains(".py")) {
+                return pyLoader.proxyInvoke(param, currentLivePyKey);
+            }
+            return jarLoader.proxyInvoke(param);
         }
-        return apiString.contains(".py") ? pyLoader.proxyInvoke(param) : jarLoader.proxyInvoke(param);
+        if ("py".equals(param.get("do"))) {
+            return pyLoader.proxyInvoke(param, getCurrentPyKey());
+        }
+        SourceBean sourceBean = ApiConfig.get().getHomeSourceBean();
+        String apiString = sourceBean.getApi();
+        return apiString.contains(".py") ? pyLoader.proxyInvoke(param, getCurrentPyKey()) : jarLoader.proxyInvoke(param);
+    }
+
+    private String getCurrentPyKey() {
+        if (!TextUtils.isEmpty(currentPyKey)) {
+            return currentPyKey;
+        }
+        SourceBean sourceBean = ApiConfig.get().getHomeSourceBean();
+        if (sourceBean.getApi().contains(".py")) {
+            currentPyKey = sourceBean.getKey();
+            pyLoader.getSpider(currentPyKey, sourceBean.getApi(), sourceBean.getExt());
+            pyLoader.setRecentPyKey(currentPyKey);
+        }
+        return currentPyKey;
     }
 
     public JSONObject jsonExt(String key, LinkedHashMap<String, String> jxs, String url) {
@@ -1182,13 +1230,18 @@ public class ApiConfig {
     }
 
     String fixContentPath(String url, String content) {
-        if (content.contains("\"./")) {
+        if (content.contains("\"./") || content.contains("\"../")) {
             url=url.replace("file://","clan://localhost/");
             if(!url.startsWith("http") && !url.startsWith("clan://")){
                 url = "http://" + url;
             }
             if(url.startsWith("clan://"))url=clanToAddress(url);
-            content = content.replace("./", url.substring(0,url.lastIndexOf("/") + 1));
+            String base = url.substring(0,url.lastIndexOf("/") + 1);
+            String parent = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+            int parentEnd = parent.lastIndexOf("/");
+            if (parentEnd >= 0) parent = parent.substring(0, parentEnd + 1);
+            content = content.replace("../", parent);
+            content = content.replace("./", base);
         }
         return content;
     }
@@ -1216,5 +1269,12 @@ public class ApiConfig {
         jarLoader.clear();
         pyLoader.clear();
         jsLoader.clear();
+    }
+
+    public void clearSpiderCache() {
+        currentPyKey = "";
+        currentLivePyKey = "";
+        currentLiveSpider = "";
+        clearLoader();
     }
 }

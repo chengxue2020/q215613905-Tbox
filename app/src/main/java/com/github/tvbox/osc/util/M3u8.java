@@ -30,7 +30,16 @@ public class M3u8 {
     private static final Pattern REGEX_X_DISCONTINUITY = Pattern.compile("#EXT-X-DISCONTINUITY[\\s\\S]*?(?=#EXT-X-DISCONTINUITY|$)");
     private static final Pattern REGEX_MEDIA_DURATION = Pattern.compile(TAG_MEDIA_DURATION + ":([\\d\\.]+)\\b");
     private static final Pattern REGEX_URI = Pattern.compile("URI=\"(.+?)\"");
-    private static final Pattern REGEX_AD_SEGMENT_URI = Pattern.compile("(?i)(^|[/?&=_.-])(ad|ads|advert|advertise|advertisement|commercial|preroll|pre-roll|midroll|mid-roll|postroll|post-roll|sponsor|scte|vast|vmap)([/?&=_.-]|$)");
+
+    // 增强：广告片段 URL 特征识别（去广告接口常用规则）
+    private static final Pattern REGEX_AD_SEGMENT_URI = Pattern.compile("(?i)(^|[/?&=_.-])(ads?|adv|advert(ise(ment)?)?|commercial|preroll|pre-roll|midroll|mid-roll|postroll|post-roll|sponsor|scte|vast|vmap|interstitial|bumper)([/?&=_.-]|$)");
+
+    // 增强：广告域名特征（常见广告CDN）
+    private static final String[] AD_DOMAIN_KEYWORDS = {
+        "adservice", "adserver", "adsystem", "doubleclick", "googlesyndication",
+        "advertising", "2mdn.net", "moatads", "scorecardresearch", "quantserve"
+    };
+
     public static int currentAdCount;
 
     public static boolean isAd(String regex) {
@@ -38,16 +47,35 @@ public class M3u8 {
     }
 
     public static String purify(String tsUrlPre, String m3u8content) {
+//        LOG.i("echo-fixAdM3u8 m3u8content: " +m3u8content);
         long start = System.currentTimeMillis();
         currentAdCount = 0;
         if (null == m3u8content || m3u8content.length() == 0) return null;
         if (m3u8content.startsWith("\ufeff")) m3u8content = m3u8content.substring(1);
         if (!m3u8content.startsWith("#EXTM3U")) return null;
+
+        // Count total segments for final safety check
+        int totalSegments = 0;
+        String[] lines = m3u8content.split(m3u8content.contains("\r\n") ? "\r\n" : "\n");
+        for (String line : lines) {
+            if (line.length() > 0 && line.charAt(0) != '#') {
+                totalSegments++;
+            }
+        }
+
         String result = removeMinorityUrl(tsUrlPre, m3u8content);
         if (result != null && currentAdCount > 0) result = get(tsUrlPre, result);
         else result = get(tsUrlPre, m3u8content);
+
+        // Final safety check: if too many segments removed, return original content
+        if (totalSegments > 0 && currentAdCount > totalSegments * 0.5) {
+            LOG.e("echo-fixAdM3u8 ERROR: removed too many segments " + currentAdCount + "/" + totalSegments + ", using original content");
+            currentAdCount = 0;
+            result = m3u8content;
+        }
+
         long cost = System.currentTimeMillis() - start;
-        LOG.i("echo-fixAdM3u8Ai cost: " + cost + "ms");
+        LOG.i("echo-fixAdM3u8 cost: " + cost + "ms, removed: " + currentAdCount + " segments");
         return result;
     }
 
@@ -61,10 +89,6 @@ public class M3u8 {
         }
         return  maxTimes*1.0 / (totalTimes*1.0);
     }
-    /**
-     * @author asdfgh
-     * <a href="https://github.com/asdfgh"> asdfgh </a>
-     */
 
     private static int timesNoAd = 15;
     private static String removeMinorityUrl(String tsUrlPre, String m3u8content) {
@@ -72,6 +96,14 @@ public class M3u8 {
         if (m3u8content.contains("\r\n"))
             linesplit = "\r\n";
         String[] lines = m3u8content.split(linesplit);
+
+        // Count total segments for safety check
+        int totalSegments = 0;
+        for (String line : lines) {
+            if (line.length() > 0 && line.charAt(0) != '#') {
+                totalSegments++;
+            }
+        }
 
         // First pass: count normalized media path prefixes.
         HashMap<String, Integer> preUrlMap = new HashMap<>();
@@ -143,6 +175,9 @@ public class M3u8 {
         }
         if (maxTimes == 0) return null;
 
+        // Diagnostic logging
+        LOG.i("echo-fixAdM3u8 URL pattern count: " + preUrlMap.size() + ", maxTimes: " + maxTimes + ", total: " + totalSegments);
+
         boolean dealedExtXKey = false;
         for (int i = 0; i < lines.length; ++i) {
             // Resolve the encryption key URI once.
@@ -192,6 +227,14 @@ public class M3u8 {
                 }
             }
         }
+
+        // Safety check: if removal ratio is too high, likely a false positive
+        if (totalSegments > 0 && currentAdCount > totalSegments * 0.3) {
+            LOG.i("echo-fixAdM3u8 suspicious ad count: " + currentAdCount + "/" + totalSegments + ", skipping URL filtering");
+            currentAdCount = 0;  // Reset to avoid affecting subsequent filters
+            return null;  // Skip this filtering method
+        }
+
         return String.join(linesplit, lines);
     }
 
@@ -283,7 +326,8 @@ public class M3u8 {
                 continue;
             }
 
-            if (inAdBreak || hasAdSignal(pending) || isAdSegmentUri(item)) {
+            // 增强：检查 URL 特征和域名特征
+            if (inAdBreak || hasAdSignal(pending) || isAdSegmentUri(item) || hasAdDomain(item)) {
                 pending.clear();
                 currentAdCount += 1;
                 changed = true;
@@ -314,11 +358,15 @@ public class M3u8 {
     }
 
     private static boolean isAdSignalTag(String line) {
+        // 增强：支持更多广告信号标记
         if (line.startsWith("#EXT-OATCLS-SCTE35")) return true;
         if (line.startsWith("#EXT-X-SCTE35")) return true;
         if (line.startsWith("#EXT-X-SPLICEPOINT-SCTE35")) return true;
+        if (line.startsWith("#EXT-X-CUE")) return true;  // 新增
         if (line.startsWith("#EXT-X-ASSET")) return true;
         if (line.startsWith("#EXT-X-VMAP-AD-BREAK")) return true;
+        if (line.startsWith("#EXT-X-AD")) return true;  // 新增
+        if (line.startsWith("#EXT-X-DISCONTINUITY-SEQUENCE")) return false;  // 排除正常标记
         return false;
     }
 
@@ -333,11 +381,26 @@ public class M3u8 {
 
     private static boolean isAdLikeText(String line) {
         String lower = line.toLowerCase();
-        return lower.contains("scte") || lower.contains("cue") || lower.contains("interstitial") || lower.contains("vmap") || lower.contains("vast") || lower.contains("advert") || lower.contains("commercial") || lower.contains("ad-") || lower.contains("ad_") || lower.contains("ad.");
+        return lower.contains("scte") || lower.contains("cue") || lower.contains("interstitial") ||
+               lower.contains("vmap") || lower.contains("vast") || lower.contains("advert") ||
+               lower.contains("commercial") || lower.contains("ad-") || lower.contains("ad_") ||
+               lower.contains("ad.") || lower.contains("preroll") || lower.contains("midroll") ||
+               lower.contains("postroll") || lower.contains("bumper");  // 增强
     }
 
     private static boolean isAdSegmentUri(String line) {
         return REGEX_AD_SEGMENT_URI.matcher(line).find();
+    }
+
+    // 增强：检查是否包含广告域名特征
+    private static boolean hasAdDomain(String url) {
+        String lower = url.toLowerCase();
+        for (String keyword : AD_DOMAIN_KEYWORDS) {
+            if (lower.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String cleanDiscontinuityGroups(String tsUrlPre, String m3u8Content) {
@@ -387,10 +450,24 @@ public class M3u8 {
 
     private static boolean shouldDropGroup(Group group, Group main) {
         if (group == main || group.segmentCount == 0) return false;
-        boolean shortGroup = group.segmentCount <= 2 || (main.totalDuration > 0 && group.totalDuration > 0 && group.totalDuration < main.totalDuration * 0.18);
-        boolean differentHost = main.host.length() > 0 && group.host.length() > 0 && !main.host.equals(group.host);
-        boolean differentPath = main.pathPrefix.length() > 0 && group.pathPrefix.length() > 0 && !main.pathPrefix.equals(group.pathPrefix);
-        boolean adLike = group.adLikeCount > 0 || differentHost || (group.segmentCount <= 2 && differentPath);
+
+        // 增强：更严格的广告识别条件
+        boolean shortGroup = group.segmentCount <= 2 ||
+                           (main.totalDuration > 0 && group.totalDuration > 0 &&
+                            group.totalDuration < main.totalDuration * 0.18);
+
+        boolean differentHost = main.host.length() > 0 && group.host.length() > 0 &&
+                               !main.host.equals(group.host);
+
+        boolean differentPath = main.pathPrefix.length() > 0 && group.pathPrefix.length() > 0 &&
+                               !main.pathPrefix.equals(group.pathPrefix);
+
+        // 增强：检查广告域名和URL特征
+        boolean hasAdFeature = group.adLikeCount > 0 || hasAdDomain(group.host) ||
+                              isAdSegmentUri(group.pathPrefix);
+
+        boolean adLike = hasAdFeature || differentHost || (group.segmentCount <= 2 && differentPath);
+
         return shortGroup && adLike;
     }
 
@@ -439,7 +516,7 @@ public class M3u8 {
                 return;
             }
             segmentCount += 1;
-            if (isAdSegmentUri(line)) adLikeCount += 1;
+            if (isAdSegmentUri(line) || hasAdDomain(line)) adLikeCount += 1;  // 增强
             if (host.length() == 0) host = hostOf(line);
             if (pathPrefix.length() == 0) pathPrefix = pathPrefixOf(line);
         }
