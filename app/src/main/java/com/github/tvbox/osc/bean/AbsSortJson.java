@@ -17,7 +17,13 @@ public class AbsSortJson implements Serializable {
         AbsSortXml absSortXml = new AbsSortXml();
         MovieSort movieSort = new MovieSort();
         movieSort.sortList = new ArrayList<>();
+        if (classes == null) {
+            classes = new ArrayList<>();
+        }
         for (AbsJsonClass cls : classes) {
+            if (cls == null || cls.type_id == null || cls.type_name == null) {
+                continue;
+            }
             MovieSort.SortData sortData = new MovieSort.SortData();
             sortData.id = cls.type_id;
             sortData.name = cls.type_name;
@@ -40,7 +46,9 @@ public class AbsSortJson implements Serializable {
     }
 
     public class AbsJsonClass implements Serializable {
+        @SerializedName(value = "type_id", alternate = "id")
         public String type_id;
+        @SerializedName(value = "type_name", alternate = "name")
         public String type_name;
         public String type_flag;
     }

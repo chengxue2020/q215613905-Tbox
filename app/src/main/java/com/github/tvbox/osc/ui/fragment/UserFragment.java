@@ -91,18 +91,18 @@ public class UserFragment extends BaseLazyFragment implements View.OnClickListen
             int spanCount = 5;
             if(style!=null && Hawk.get(HawkConfig.HOME_REC, 0) == 1)spanCount=ImgUtil.spanCountByStyle(style,spanCount);
             tvHotList.setLayoutManager(new V7GridLayoutManager(this.mContext, spanCount));
-            int paddingLeft = getResources().getDimensionPixelSize(R.dimen.vs_15);
-            int paddingTop = getResources().getDimensionPixelSize(R.dimen.vs_10);
-            int paddingRight = getResources().getDimensionPixelSize(R.dimen.vs_15);
-            int paddingBottom = getResources().getDimensionPixelSize(R.dimen.vs_10);
+            int paddingLeft = getResources().getDimensionPixelSize(R.dimen.vs_0);
+            int paddingTop = getResources().getDimensionPixelSize(R.dimen.vs_20);
+            int paddingRight = getResources().getDimensionPixelSize(R.dimen.vs_0);
+            int paddingBottom = getResources().getDimensionPixelSize(R.dimen.vs_20);
             tvHotList.setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);
         } else {
             tvHotList.setVisibility(View.VISIBLE);
             tvHotList.setLayoutManager(new V7LinearLayoutManager(this.mContext, V7LinearLayoutManager.HORIZONTAL, false));
-            int paddingLeft = getResources().getDimensionPixelSize(R.dimen.vs_15);
-            int paddingTop = getResources().getDimensionPixelSize(R.dimen.vs_40);
-            int paddingRight = getResources().getDimensionPixelSize(R.dimen.vs_15);
-            int paddingBottom = getResources().getDimensionPixelSize(R.dimen.vs_40);
+            int paddingLeft = getResources().getDimensionPixelSize(R.dimen.vs_0);
+            int paddingTop = getResources().getDimensionPixelSize(R.dimen.vs_20);
+            int paddingRight = getResources().getDimensionPixelSize(R.dimen.vs_0);
+            int paddingBottom = getResources().getDimensionPixelSize(R.dimen.vs_20);
             tvHotList.setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);
         }
         if (Hawk.get(HawkConfig.HOME_REC, 0) == 2) {
@@ -198,7 +198,8 @@ public class UserFragment extends BaseLazyFragment implements View.OnClickListen
                     bundle.putString("id", vod.id);
                     bundle.putString("sourceKey", vod.sourceKey);
                     SourceBean sourceBean = ApiConfig.get().getSource(vod.sourceKey);
-                    if(sourceBean!=null){
+                    if(sourceBean!=null && !vod.id.startsWith("msearch:")){
+                        bundle.putString("title", vod.name);
                         bundle.putString("picture", vod.pic);
                         jumpActivity(DetailActivity.class, bundle);
                     }else {

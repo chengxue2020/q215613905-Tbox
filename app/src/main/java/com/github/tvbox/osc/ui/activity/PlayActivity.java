@@ -42,6 +42,7 @@ import androidx.recyclerview.widget.DiffUtil;
 import com.github.catvod.crawler.Spider;
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.api.ApiConfig;
+import com.github.tvbox.osc.api.DanmakuApi;
 import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.base.BaseActivity;
 import com.github.tvbox.osc.bean.ParseBean;
@@ -56,12 +57,15 @@ import com.github.tvbox.osc.player.MyVideoView;
 import com.github.tvbox.osc.player.TrackInfo;
 import com.github.tvbox.osc.player.TrackInfoBean;
 import com.github.tvbox.osc.player.controller.VodController;
+import com.github.tvbox.osc.player.danmu.Parser;
 import com.github.tvbox.osc.server.ControlManager;
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter;
+import com.github.tvbox.osc.ui.dialog.DanmuSettingDialog;
 import com.github.tvbox.osc.ui.dialog.SearchSubtitleDialog;
 import com.github.tvbox.osc.ui.dialog.SelectDialog;
 import com.github.tvbox.osc.ui.dialog.SubtitleDialog;
 import com.github.tvbox.osc.util.AdBlocker;
+import com.github.tvbox.osc.util.DanmuHelper;
 import com.github.tvbox.osc.util.DefaultConfig;
 import com.github.tvbox.osc.util.FileUtils;
 import com.github.tvbox.osc.util.HawkConfig;
@@ -82,6 +86,8 @@ import com.obsez.android.lib.filechooser.ChooserDialog;
 import com.orhanobut.hawk.Hawk;
 
 import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -109,6 +115,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import me.jessyan.autosize.AutoSize;
+import master.flame.danmaku.danmaku.model.BaseDanmaku;
+import master.flame.danmaku.danmaku.model.IDisplayer;
+import master.flame.danmaku.danmaku.model.android.DanmakuContext;
+import master.flame.danmaku.ui.widget.DanmakuView;
 import tv.danmaku.ijk.media.player.IMediaPlayer;
 import tv.danmaku.ijk.media.player.IjkTimedText;
 import xyz.doikki.videoplayer.player.AbstractPlayer;
@@ -122,6 +132,11 @@ public class PlayActivity extends BaseActivity {
     private VodController mController;
     private SourceViewModel sourceViewModel;
     private Handler mHandler;
+    private ExecutorService danmuExecutor;
+    private DanmakuView mDanmuView;
+    private DanmakuContext mDanmakuContext;
+    private String danmuText;
+    private final AtomicInteger danmuLoadSeq = new AtomicInteger();
 
     private long videoDuration = -1;
 
@@ -130,12 +145,123 @@ public class PlayActivity extends BaseActivity {
         return R.layout.activity_play;
     }
 
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void refresh(RefreshEvent event) {
+        if (event.type == RefreshEvent.TYPE_SET_DANMU_SETTINGS) {
+            setDanmuViewSettings(event.obj instanceof Boolean && (Boolean) event.obj);
+        }
+    }
+
     @Override
     protected void init() {
+        EventBus.getDefault().register(this);
         initView();
+        initDanmuView();
         initViewModel();
         initData();
-        Hawk.put(HawkConfig.PLAYER_IS_LIVE,false);
+    }
+
+    private void initDanmuView() {
+        mDanmuView = findViewById(R.id.danmaku);
+        mDanmakuContext = DanmakuContext.create();
+        mVideoView.setDanmuView(mDanmuView);
+        setDanmuViewSettings(false);
+    }
+
+    private void setDanmuViewSettings(boolean reload) {
+        if (mDanmuView == null || mDanmakuContext == null) return;
+        if (!DanmuHelper.isOpen()) {
+            releaseDanmuView();
+            if (mController != null) mController.setHasDanmu(!TextUtils.isEmpty(danmuText));
+            return;
+        }
+        HashMap<Integer, Integer> maxLines = new HashMap<>();
+        int maxLine = DanmuHelper.getMaxLine();
+        maxLines.put(BaseDanmaku.TYPE_FIX_TOP, maxLine);
+        maxLines.put(BaseDanmaku.TYPE_SCROLL_RL, maxLine);
+        maxLines.put(BaseDanmaku.TYPE_SCROLL_LR, maxLine);
+        maxLines.put(BaseDanmaku.TYPE_FIX_BOTTOM, maxLine);
+        mDanmakuContext.setMaximumLines(maxLines)
+                .setScrollSpeedFactor(DanmuHelper.getSpeed())
+                .setDanmakuTransparency(DanmuHelper.getAlpha())
+                .setScaleTextSize(DanmuHelper.getSizeScale());
+        mDanmakuContext.setDanmakuStyle(IDisplayer.DANMAKU_STYLE_STROKEN, 3)
+                .setDanmakuMargin(8);
+        if (reload && !TextUtils.isEmpty(danmuText) && DanmuHelper.isOpen()) {
+            prepareDanmu(danmuText);
+        }
+    }
+
+    private void checkDanmu(String danmu) {
+        danmuText = TextUtils.isEmpty(danmu) ? "" : danmu.trim();
+        releaseDanmuView();
+        boolean hasDanmu = !TextUtils.isEmpty(danmuText);
+        mController.setHasDanmu(hasDanmu);
+        if (!hasDanmu || !DanmuHelper.isOpen()) {
+            if (mDanmuView != null) mDanmuView.setVisibility(View.GONE);
+            return;
+        }
+        if (mDanmuView != null) mDanmuView.setVisibility(View.VISIBLE);
+        prepareDanmu(danmuText);
+    }
+
+    private void prepareDanmu(String danmu) {
+        if (TextUtils.isEmpty(danmu)) return;
+        int seq = danmuLoadSeq.incrementAndGet();
+        if (danmuExecutor == null || danmuExecutor.isShutdown()) {
+            danmuExecutor = Executors.newSingleThreadExecutor();
+        }
+        danmuExecutor.execute(() -> {
+            Parser parser = new Parser(danmu);
+            int danmuCount = parser.getDanmuCount();
+            LOG.i("echo-danmu parsed count: " + danmuCount);
+            runOnUiThread(() -> {
+                if (seq != danmuLoadSeq.get() || mDanmuView == null || mDanmakuContext == null) return;
+                try {
+                    mDanmuView.release();
+                    if (mVideoView != null) mVideoView.setDanmuView(mDanmuView);
+                    if (danmuCount <= 0) {
+                        LOG.e("echo-danmu empty after parse");
+                        mDanmuView.setVisibility(View.GONE);
+                        return;
+                    }
+                    mDanmuView.prepare(parser, mDanmakuContext);
+                    mDanmuView.setVisibility(DanmuHelper.isOpen() ? View.VISIBLE : View.GONE);
+                    if (mVideoView != null && mVideoView.isPlaying()) {
+                        mDanmuView.seekTo(mVideoView.getCurrentPosition());
+                    }
+                    mDanmuView.postDelayed(() -> {
+                        if (seq == danmuLoadSeq.get()
+                                && mVideoView != null
+                                && mVideoView.isPlaying()
+                                && mDanmuView != null
+                                && mDanmuView.isPrepared()) {
+                            mDanmuView.start(mVideoView.getCurrentPosition());
+                        }
+                    }, 300);
+                } catch (Throwable th) {
+                    LOG.e("echo-danmu prepare error: " + th.getMessage());
+                    mDanmuView.setVisibility(View.GONE);
+                }
+            });
+        });
+    }
+
+    private void resetDanmuState() {
+        DanmakuApi.cancel();
+        danmuText = "";
+        danmuLoadSeq.incrementAndGet();
+        if (mController != null) mController.setHasDanmu(false);
+        releaseDanmuView();
+    }
+
+    private void releaseDanmuView() {
+        if (mDanmuView == null) return;
+        try {
+            mDanmuView.release();
+        } catch (Throwable ignored) {
+        }
+        mDanmuView.setVisibility(View.GONE);
     }
 
     public long getSavedProgress(String url) {
@@ -191,6 +317,12 @@ public class PlayActivity extends BaseActivity {
         mVideoView.setProgressManager(progressManager);
         mController.setListener(new VodController.VodControlListener() {
             @Override
+            public void showDanmuSetting() {
+                DanmuSettingDialog dialog = new DanmuSettingDialog(PlayActivity.this, mDanmuView);
+                dialog.show();
+            }
+
+            @Override
             public void playNext(boolean rmProgress) {
                 String preProgressKey = progressKey;
                 PlayActivity.this.playNext(rmProgress);
@@ -206,7 +338,6 @@ public class PlayActivity extends BaseActivity {
             @Override
             public void changeParse(ParseBean pb) {
                 autoRetryCount = 0;
-                triedLineFlags.clear();
                 doParse(pb);
             }
 
@@ -219,7 +350,6 @@ public class PlayActivity extends BaseActivity {
             @Override
             public void replay(boolean replay) {
                 autoRetryCount = 0;
-                triedLineFlags.clear();
                 if(replay){
                     play(true);
                 }else {
@@ -697,6 +827,7 @@ public class PlayActivity extends BaseActivity {
                         }
                         String flag = info.optString("flag");
                         String url = info.getString("url");
+                        String danmaku = info.optString("danmaku", "");
                         if(url.startsWith("[")){
                             url=mController.firstUrlByArray(url);
                         }
@@ -729,12 +860,27 @@ public class PlayActivity extends BaseActivity {
                             mController.showParse(false);
                             playUrl(playUrl + url, headers);
                         }
+                        checkDanmu(danmaku);
+                        searchDanmu(danmaku);
                     } catch (Throwable th) {
                     }
                 } else {
 //                    setTip("获取播放信息错误", false, true);
                     errorWithRetry("获取播放信息错误", true);
                 }
+            }
+        });
+    }
+
+    private void searchDanmu(String danmaku) {
+        if (!TextUtils.isEmpty(danmaku) || !DanmakuApi.canSearch() || mVodInfo == null) return;
+        VodInfo.VodSeries series = getCurrentSeries(mVodInfo.playFlag, mVodInfo.playIndex);
+        String key = progressKey;
+        DanmakuApi.search(mVodInfo.name, series == null ? "" : series.name, new DanmakuApi.SearchCallback() {
+            @Override
+            public void onFound(String url) {
+                if (!TextUtils.equals(key, progressKey)) return;
+                checkDanmu(url);
             }
         });
     }
@@ -748,7 +894,6 @@ public class PlayActivity extends BaseActivity {
             sourceKey = bundle.getString("sourceKey");
             sourceBean = ApiConfig.get().getSource(sourceKey);
             initPlayerCfg();
-            triedLineFlags.clear();
             play(false);
         }
     }
@@ -845,6 +990,12 @@ public class PlayActivity extends BaseActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        EventBus.getDefault().unregister(this);
+        resetDanmuState();
+        if (danmuExecutor != null) {
+            danmuExecutor.shutdownNow();
+            danmuExecutor = null;
+        }
         if (mVideoView != null) {
             mVideoView.release();
             mVideoView = null;
@@ -860,7 +1011,6 @@ public class PlayActivity extends BaseActivity {
     private SourceBean sourceBean;
 
     private void playNext(boolean isProgress) {
-        triedLineFlags.clear();
         boolean hasNext = true;
         if (mVodInfo == null || mVodInfo.seriesMap.get(mVodInfo.playFlag) == null) {
             hasNext = false;
@@ -882,7 +1032,6 @@ public class PlayActivity extends BaseActivity {
     }
 
     private void playPrevious() {
-        triedLineFlags.clear();
         boolean hasPre = true;
         if (mVodInfo == null || mVodInfo.seriesMap.get(mVodInfo.playFlag) == null) {
             hasPre = false;
@@ -946,14 +1095,16 @@ public class PlayActivity extends BaseActivity {
             return true;
         } else {
             // 当前线路重试耗尽，尝试切换下一条线路
-            return tryNextLine();
+            LOG.i("echo-autoRetry line switching disabled in PlayActivity");
+            autoRetryCount = 0;
+            allowSwitchPlayer = true;
+            return false;
         }
     }
 
     boolean tryNextLine() {
         if (mVodInfo == null || mVodInfo.seriesMap == null || mVodInfo.seriesMap.isEmpty()) {
             autoRetryCount = 0;
-            triedLineFlags.clear();
             return false;
         }
         // 将当前线路标记为已尝试
@@ -1091,6 +1242,7 @@ public class PlayActivity extends BaseActivity {
         initParseLoadFound();
         allowSwitchPlayer = true;
         mController.stopOther();
+        resetDanmuState();
         if(mVideoView!=null) mVideoView.release();
         subtitleCacheKey = mVodInfo.sourceKey + "-" + mVodInfo.id + "-" + mVodInfo.playFlag + "-" + mVodInfo.playIndex+ "-" + vs.name + "-subt";
         progressKey = mVodInfo.sourceKey + mVodInfo.id + mVodInfo.playFlag + mVodInfo.playIndex + vs.name;

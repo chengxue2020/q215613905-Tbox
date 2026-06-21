@@ -170,6 +170,7 @@ public class VodController extends BaseController {
     public SimpleSubtitleView mSubtitleView;
     TextView mZimuBtn;
     TextView mAudioTrackBtn;
+    TextView mDanmuSettingBtn;
     public TextView mLandscapePortraitBtn;
     private View backBtn;//返回键
     private boolean isClickBackBtn;
@@ -177,6 +178,7 @@ public class VodController extends BaseController {
     TextView mScreenDisplay; //增加屏显开关
     LinearLayout tv_screen_display; //增加屏显布局
     TextView net_play_speed;
+    private boolean hasDanmu = false;
 
     LockRunnable lockRunnable = new LockRunnable();
     private boolean isLock = false;
@@ -252,6 +254,7 @@ public class VodController extends BaseController {
         mSubtitleView = findViewById(R.id.subtitle_view);
         mZimuBtn = findViewById(R.id.zimu_select);
         mAudioTrackBtn = findViewById(R.id.audio_track_select);
+        mDanmuSettingBtn = findViewById(R.id.danmu_setting);
         mLandscapePortraitBtn = findViewById(R.id.landscape_portrait);
         backBtn = findViewById(R.id.tv_back);
         seekTime = findViewById(R.id.tv_seek_time);
@@ -667,6 +670,13 @@ public class VodController extends BaseController {
                 hideBottom();
             }
         });
+        mDanmuSettingBtn.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                FastClickCheckUtil.check(view);
+                listener.showDanmuSetting();
+            }
+        });
         mLandscapePortraitBtn.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -760,9 +770,9 @@ public class VodController extends BaseController {
     void updatePlayerCfgView() {
         try {
             int playerType = mPlayerConfig.getInt("pl");
-            mPlayerBtn.setText(PlayerHelper.getPlayerName(playerType));
+            mPlayerBtn.setText(getPlayerShortName(playerType));
             mPlayerScaleBtn.setText(PlayerHelper.getScaleName(mPlayerConfig.getInt("sc")));
-            mPlayerIJKBtn.setText(mPlayerConfig.getString("ijk"));
+            mPlayerIJKBtn.setText(getCodecShortName(mPlayerConfig.getString("ijk")));
             mPlayerIJKBtn.setVisibility(playerType == 1 ? VISIBLE : GONE);
             mPlayerScaleBtn.setText(PlayerHelper.getScaleName(mPlayerConfig.getInt("sc")));
             mPlayerSpeedBtn.setText("x" + mPlayerConfig.getDouble("sp"));
@@ -772,6 +782,21 @@ public class VodController extends BaseController {
         } catch (JSONException e) {
             e.printStackTrace();
         }
+    }
+
+    private String getPlayerShortName(int playerType) {
+        String playerName = PlayerHelper.getPlayerName(playerType);
+        return playerName;
+    }
+
+    private String getCodecShortName(String codecName) {
+        if ("硬解码".equals(codecName)) {
+            return "硬解";
+        }
+        if ("软解码".equals(codecName)) {
+            return "软解";
+        }
+        return codecName;
     }
 
     public void setTitle(String playTitleInfo) {
@@ -787,6 +812,16 @@ public class VodController extends BaseController {
         skipEnd = true;
         mHandler.removeMessages(1004);
         mHandler.sendEmptyMessageDelayed(1004, 100);
+    }
+
+    public void setHasDanmu(boolean hasDanmu) {
+        this.hasDanmu = hasDanmu;
+        updateDanmuBtn();
+    }
+
+    public void updateDanmuBtn() {
+        if (mDanmuSettingBtn == null) return;
+        mDanmuSettingBtn.setVisibility(hasDanmu ? VISIBLE : GONE);
     }
 
     public interface VodControlListener {
@@ -807,6 +842,8 @@ public class VodController extends BaseController {
         void selectSubtitle();
 
         void selectAudioTrack();
+
+        void showDanmuSetting();
 
         void startPlayUrl(String url, HashMap<String, String> headers);
 

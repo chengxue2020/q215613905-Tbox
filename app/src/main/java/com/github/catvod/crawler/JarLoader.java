@@ -11,15 +11,19 @@ import com.lzy.okgo.OkGo;
 
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 import dalvik.system.DexClassLoader;
 import okhttp3.Response;
@@ -28,7 +32,9 @@ public class JarLoader {
     private final ConcurrentHashMap<String, DexClassLoader> classLoaders = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Method> proxyMethods = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Spider> spiders = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Boolean> protectedInitJars = new ConcurrentHashMap<>();
     private volatile String recentJarKey = "";
+    private static final String DEFAULT_CONFIG_JSON = "{\"version\":\"25.0\",\"update\":\"关闭\",\"danmuColor\":\"默认\",\"aliHD\":\"阿里原画\",\"quarkHD\":\"夸克原画\",\"ucHD\":\"UC原画\",\"panBlock\":\"\",\"proxyMode\":\"Go多线程\",\"pansouUrl\":\"https://so.252035.xyz\",\"panOrder\":\"百度,夸克,UC,天翼,123,阿里,移动\",\"homePage\":\"热门电影,热播剧集,热门动漫,热播综艺,电影筛选,电视筛选,电影榜单,电视剧榜单\",\"aliThread\":\"64\",\"quarkThread\":\"16\",\"ucThread\":\"自动\"}";
 
     /**
      * 不要在主线程调用我
@@ -52,6 +58,7 @@ public class JarLoader {
         String jarKey = MD5.string2MD5(jarUrl);
         String jarMd5 = urls.length > 1 ? urls[1].trim() : "";
         loadJarInternal(jarUrl,jarMd5,jarKey);
+        recentJarKey = jarKey;
     }
 
     public void clear() {
@@ -63,6 +70,7 @@ public class JarLoader {
     private boolean loadClassLoader(String jar, String key) {
         if (classLoaders.containsKey(key)){
             Log.i("JarLoader", "echo-loadClassLoader jar缓存: " + key);
+            ensureDefaultConfig();
             return true;
         }
         boolean success = false;
@@ -82,9 +90,16 @@ public class JarLoader {
                             @Override
                             public void run() {
                                 try {
-                                    initMethod.invoke(null, App.getInstance());
+                                    if (isProtectedInitJar(jar)) {
+                                        initProtectedJar(classInit);
+                                    } else {
+                                        initMethod.invoke(null, App.getInstance());
+                                        invokeSaveConfig(classInit);
+                                    }
                                 } catch (Exception e) {
                                     e.printStackTrace();
+                                } finally {
+                                    ensureDefaultConfig();
                                 }
                             }
                         });
@@ -113,14 +128,127 @@ public class JarLoader {
                 classLoaders.put(key, classLoader);
             }
         } catch (Throwable th) {
+            Log.i("JarLoader", "echo-loadClassLoader error key=" + key + ", msg=" + th.getMessage());
             th.printStackTrace();
         }
         return success;
     }
 
+    private boolean isProtectedInitJar(String jar) {
+        Boolean cached = protectedInitJars.get(jar);
+        if (cached != null) return cached;
+        boolean result = false;
+        try {
+            File file = new File(jar);
+            if (file.exists()) {
+                byte[] data = FileUtils.readSimple(file);
+                if (data != null && data.length > 4 && data[0] == 'd' && data[1] == 'e' && data[2] == 'x') {
+                    result = isProtectedInitDex(data);
+                } else {
+                    try (ZipFile zip = new ZipFile(file)) {
+                        java.util.Enumeration<? extends ZipEntry> entries = zip.entries();
+                        while (entries.hasMoreElements()) {
+                            ZipEntry entry = entries.nextElement();
+                            if (!entry.getName().endsWith(".dex")) continue;
+                            try (InputStream is = zip.getInputStream(entry)) {
+                                if (isProtectedInitDex(readBytes(is))) {
+                                    result = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        protectedInitJars.put(jar, result);
+        return result;
+    }
+
+    private boolean isProtectedInitDex(byte[] data) {
+        if (data == null || data.length == 0) return false;
+        try {
+            String text = new String(data, "UTF-8");
+            return text.contains("包名不匹配")
+                    && text.contains("killProcess")
+                    && !text.contains("com.github.tvbox.osc.jun");
+        } catch (Throwable th) {
+            return false;
+        }
+    }
+
+    private byte[] readBytes(InputStream is) throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int len;
+        while ((len = is.read(buffer)) != -1) {
+            baos.write(buffer, 0, len);
+        }
+        return baos.toByteArray();
+    }
+
+    private void initProtectedJar(Class<?> classInit) {
+        try {
+            Method get = classInit.getMethod("get");
+            Object init = get.invoke(null);
+            Field context = classInit.getDeclaredField("c");
+            context.setAccessible(true);
+            context.set(init, App.getInstance());
+        } catch (Throwable ignored) {
+        }
+        invokeSaveConfig(classInit);
+        invokeNoArg(classInit, "replaceCloudDiskNames");
+        invokeStartGoProxy(classInit);
+    }
+
+    private void invokeSaveConfig(Class<?> classInit) {
+        try {
+            Method saveConfig = classInit.getMethod("saveConfig");
+            saveConfig.invoke(null);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void invokeNoArg(Class<?> classInit, String methodName) {
+        try {
+            Method method = classInit.getMethod(methodName);
+            method.invoke(null);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void invokeStartGoProxy(Class<?> classInit) {
+        try {
+            Method method = classInit.getMethod("startGoProxy", Context.class);
+            method.invoke(null, App.getInstance());
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void ensureDefaultConfig() {
+        try {
+            File config = new File(App.getInstance().getFilesDir(), "config.json");
+            boolean rewrite = !config.exists() || config.length() == 0;
+            if (!rewrite) {
+                try {
+                    JSONObject obj = new JSONObject(FileUtils.readFileToString(config.getAbsolutePath(), "UTF-8"));
+                    rewrite = !obj.has("homePage");
+                } catch (Throwable th) {
+                    rewrite = true;
+                }
+            }
+            if (rewrite) {
+                FileUtils.saveCache(config, DEFAULT_CONFIG_JSON);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
     private DexClassLoader loadJarInternal(String jar, String md5, String key) {
         if (classLoaders.containsKey(key)){
             Log.i("JarLoader", "echo-loadJarInternal jar缓存: " + key);
+            ensureDefaultConfig();
             return classLoaders.get(key);
         }
         File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/csp/" + key + ".jar");
@@ -169,6 +297,7 @@ public class JarLoader {
     public Spider getSpider(String key, String cls, String ext, String jar) {
         if (spiders.containsKey(key)) {
             Log.i("JarLoader", "echo-getSpider spider缓存: " + key);
+            ensureDefaultConfig();
             return spiders.get(key);
         }
         String clsKey = cls.replace("csp_", "");
@@ -186,10 +315,16 @@ public class JarLoader {
         recentJarKey = jarKey;
         assert jarKey != null;
         DexClassLoader classLoader = jarKey.equals("main")? classLoaders.get("main"):loadJarInternal(jarUrl, jarMd5, jarKey);
-        if (classLoader == null) return new SpiderNull();
+        if (classLoader == null) {
+            Log.i("JarLoader", "echo-getSpider classLoader null key=" + key + ", jarKey=" + jarKey + ", jarUrl=" + jarUrl);
+            return new SpiderNull();
+        }
         try {
+            ensureDefaultConfig();
             Log.i("JarLoader", "echo-getSpider 加载spider: " + key);
             Spider sp = (Spider) classLoader.loadClass("com.github.catvod.spider." + clsKey).newInstance();
+            sp.siteKey = key;
+            sp.initApi(new SpiderApi());
             sp.init(App.getInstance(), ext);
 //            if (!jar.isEmpty()) {
 //                sp.homeContent(false); // 增加此行 应该可以解决部分写的有问题源的历史记录问题 但会增加这个源的首次加载时间 不需要可以已删掉
@@ -197,6 +332,7 @@ public class JarLoader {
             spiders.put(key, sp);
             return sp;
         } catch (Throwable th) {
+            Log.i("JarLoader", "echo-getSpider error key=" + key + ", clsKey=" + clsKey + ", msg=" + th.getMessage());
             th.printStackTrace();
         }
         return new SpiderNull();

@@ -237,6 +237,10 @@ public class GridFragment extends BaseLazyFragment {
                 FastClickCheckUtil.check(view);
                 Movie.Video video = gridAdapter.getData().get(position);
                 if (video != null) {
+                    if (video.action != null) {
+                        sourceViewModel.action(video.sourceKey, video.action);
+                        return;
+                    }
                     Bundle bundle = new Bundle();
                     bundle.putString("id", video.id);
                     bundle.putString("sourceKey", video.sourceKey);
@@ -317,6 +321,14 @@ public class GridFragment extends BaseLazyFragment {
                     gridAdapter.loadMoreEnd();
                     gridAdapter.setEnableLoadMore(false);
                 }
+            }
+        });
+        sourceViewModel.actionResult.observe(this, new Observer<JSONObject>() {
+            @Override
+            public void onChanged(JSONObject jsonObject) {
+                if (jsonObject == null) return;
+                String msg = jsonObject.optString("msg");
+                if (!msg.isEmpty()) Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
             }
         });
     }

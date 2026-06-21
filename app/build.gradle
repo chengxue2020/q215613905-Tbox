@@ -4,7 +4,7 @@ android {
     compileSdkVersion 33
 
     defaultConfig {
-        applicationId 'com.github.tvbox.osc'
+        applicationId 'com.github.tvbox.osc.jun'
         targetSdkVersion 28
         versionCode 1
         versionName '1.0.0'
@@ -23,7 +23,16 @@ android {
 
     flavorDimensions "mode"
     productFlavors {
-        normal {
+        java {
+            dimension "mode"
+            minSdkVersion 19
+            ndk {
+                //noinspection ChromeOsAbiSupport
+                abiFilters 'armeabi-v7a', 'arm64-v8a'
+            }
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        java32 {
             dimension "mode"
             minSdkVersion 19
             ndk {
@@ -45,6 +54,15 @@ android {
             minSdkVersion 19
             ndk {
                 //noinspection ChromeOsAbiSupport
+                abiFilters 'armeabi-v7a', 'arm64-v8a'
+            }
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro', 'proguard-python.pro'
+        }
+        python32 {
+            dimension "mode"
+            minSdkVersion 19
+            ndk {
+                //noinspection ChromeOsAbiSupport
                 abiFilters 'armeabi-v7a'
             }
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro', 'proguard-python.pro'
@@ -60,8 +78,17 @@ android {
     }
 
     sourceSets {
+        java {
+            java.srcDirs += 'src/normal/java'
+        }
+        java32 {
+            java.srcDirs += 'src/normal/java'
+        }
         java64 {
             java.srcDirs += 'src/normal/java'
+        }
+        python32 {
+            java.srcDirs += 'src/python/java'
         }
         python64 {
             java.srcDirs += 'src/python/java'
@@ -86,7 +113,7 @@ android {
 
     applicationVariants.configureEach { variant ->
         variant.outputs.configureEach { output ->
-            def flavorNames = variant.productFlavors.collect { it.name == "normal" ? "java32" : it.name }.join('-')
+            def flavorNames = variant.productFlavors.collect { it.name }.join('-')
             // 构建自定义文件名
             def fileName = "TVBox_${variant.buildType.name}-${flavorNames}.apk"
             outputFileName = fileName
@@ -133,7 +160,7 @@ dependencies {
     implementation 'com.squareup.okio:okio:2.8.0'
     implementation 'com.github.CymChad:BaseRecyclerViewAdapterHelper:2.9.45-androidx'
     implementation 'com.kingja.loadsir:loadsir:1.3.8'
-    implementation 'com.google.code.gson:gson:2.8.7'
+    implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'com.squareup.picasso:picasso:2.71828'
     implementation 'me.jessyan:autosize:1.2.1'
     implementation('com.thoughtworks.xstream:xstream:1.4.15') {
@@ -141,10 +168,12 @@ dependencies {
     }
     implementation 'org.greenrobot:eventbus:3.2.0'
     implementation 'com.orhanobut:hawk:2.0.1'
+    implementation 'com.github.ctiao:DanmakuFlameMaster:0.9.25'
 
     implementation project(":player")
     implementation project(":quickjs")
     pythonImplementation project(":pyramid")
+    python32Implementation project(":pyramid")
     python64Implementation project(":pyramid")
 
 

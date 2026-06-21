@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/button_dialog_main"
+    android:background="@drawable/button_danmu_setting"
     android:focusable="true">
 
     <LinearLayout
@@ -27,7 +27,7 @@
             android:singleLine="true"
             android:maxLines="1"
             android:text="字幕搜索结果"
-            android:textColor="@android:color/white"
+            android:textColor="@color/dialog_text_primary"
             android:textSize="@dimen/ts_22" />
         <TextView
             android:id="@+id/subtitleNameInfo"
@@ -36,7 +36,7 @@
             android:singleLine="true"
             android:maxLines="1"
             android:text="压缩包"
-            android:textColor="@android:color/white"
+            android:textColor="@color/dialog_text_primary"
             android:textSize="@dimen/ts_22" />
 
     </LinearLayout>

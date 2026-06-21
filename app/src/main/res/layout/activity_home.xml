@@ -40,10 +40,12 @@
             android:focusable="false"
             android:focusableInTouchMode="false"
             android:gravity="right|center_vertical"
+            android:includeFontPadding="false"
+            android:maxLines="1"
             android:textAlignment="gravity"
             android:textColor="@android:color/white"
-            android:textSize="@dimen/ts_28"
-            tools:text="111111111111111" />
+            android:textSize="@dimen/ts_26"
+            tools:text="2026/06/16  周二  15:01" />
     </LinearLayout>
 
     <LinearLayout

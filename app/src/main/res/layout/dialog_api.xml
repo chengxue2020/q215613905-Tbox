@@ -4,12 +4,12 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content">
 
-    <!-- 将外层容器高度改为 wrap_content，避免内部控件溢出 -->
+    <!-- 灏嗗灞傚鍣ㄩ珮搴︽敼涓?wrap_content锛岄伩鍏嶅唴閮ㄦ帶浠舵孩鍑?-->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:background="@drawable/shape_dialog_bg_main"
+        android:background="@drawable/shape_danmu_setting_bg"
         android:orientation="horizontal"
         android:padding="@dimen/vs_30">
 
@@ -35,11 +35,11 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="@dimen/vs_10"
                 android:lineSpacingMultiplier="1.5"
-                android:textColor="@color/color_CC000000"
+                android:textColor="@color/dialog_text_primary"
                 android:textSize="@dimen/ts_24"
                 tools:text="1111111111111111111111111111111111111111111111111111" />
 
-            <!-- 配置历史与存储权限 -->
+            <!-- 閰嶇疆鍘嗗彶涓庡瓨鍌ㄦ潈闄?-->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -52,12 +52,12 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginEnd="@dimen/vs_5"
-                    android:background="@drawable/button_dialog_main"
+                    android:background="@drawable/button_danmu_setting"
                     android:focusable="true"
                     android:gravity="center"
                     android:padding="@dimen/vs_10"
                     android:text="历史直播"
-                    android:textColor="@color/color_FFFFFF"
+                    android:textColor="@color/dialog_text_primary"
                     android:textSize="@dimen/ts_22"
                     android:layout_marginRight="@dimen/vs_5" />
 
@@ -67,17 +67,17 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginStart="@dimen/vs_5"
-                    android:background="@drawable/button_dialog_main"
+                    android:background="@drawable/button_danmu_setting"
                     android:focusable="true"
                     android:gravity="center"
                     android:padding="@dimen/vs_10"
                     android:text="存储权限"
-                    android:textColor="@color/color_FFFFFF"
+                    android:textColor="@color/dialog_text_primary"
                     android:textSize="@dimen/ts_22"
                     android:layout_marginLeft="@dimen/vs_5" />
             </LinearLayout>
 
-            <!-- 点播输入区域 -->
+            <!-- 鐐规挱杈撳叆鍖哄煙 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -92,6 +92,7 @@
                     android:gravity="center"
                     android:paddingRight="@dimen/vs_5"
                     android:text="点播"
+                    android:textColor="@color/dialog_text_primary"
                     android:textSize="@dimen/ts_22"
                     android:paddingEnd="@dimen/vs_5"
                     android:cursorVisible="false"
@@ -111,8 +112,8 @@
                     android:paddingTop="@dimen/vs_10"
                     android:paddingRight="@dimen/vs_2"
                     android:paddingBottom="@dimen/vs_10"
-                    android:textColor="@color/color_CC000000"
-                    android:textColorHint="@color/color_6C3D3D3D"
+                    android:textColor="@color/dialog_text_primary"
+                    android:textColorHint="@color/dialog_text_hint"
                     android:textSize="@dimen/ts_26" />
 
                 <TextView
@@ -121,17 +122,17 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:layout_marginStart="@dimen/vs_5"
-                    android:background="@drawable/button_dialog_main"
+                    android:background="@drawable/button_danmu_setting"
                     android:focusable="true"
                     android:gravity="center"
                     android:padding="@dimen/vs_10"
                     android:text="确定"
-                    android:textColor="@color/color_FFFFFF"
+                    android:textColor="@color/dialog_text_primary"
                     android:textSize="@dimen/ts_22"
                     android:layout_marginLeft="@dimen/vs_5" />
             </LinearLayout>
 
-            <!-- 直播输入区域 -->
+            <!-- 鐩存挱杈撳叆鍖哄煙 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -145,6 +146,7 @@
                     android:gravity="center"
                     android:paddingRight="@dimen/vs_5"
                     android:text="直播"
+                    android:textColor="@color/dialog_text_primary"
                     android:textSize="@dimen/ts_22"
                     android:paddingEnd="@dimen/vs_5"
                     android:cursorVisible="false"
@@ -164,8 +166,8 @@
                     android:paddingTop="@dimen/vs_10"
                     android:paddingRight="@dimen/vs_2"
                     android:paddingBottom="@dimen/vs_10"
-                    android:textColor="@color/color_CC000000"
-                    android:textColorHint="@color/color_6C3D3D3D"
+                    android:textColor="@color/dialog_text_primary"
+                    android:textColorHint="@color/dialog_text_hint"
                     android:textSize="@dimen/ts_26" />
 
                 <TextView
@@ -174,12 +176,12 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:layout_marginStart="@dimen/vs_5"
-                    android:background="@drawable/button_dialog_main"
+                    android:background="@drawable/button_danmu_setting"
                     android:focusable="true"
                     android:gravity="center"
                     android:padding="@dimen/vs_10"
                     android:text="确定"
-                    android:textColor="@color/color_FFFFFF"
+                    android:textColor="@color/dialog_text_primary"
                     android:textSize="@dimen/ts_22"
                     android:layout_marginLeft="@dimen/vs_5" />
             </LinearLayout>

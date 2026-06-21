@@ -4,8 +4,10 @@ import android.annotation.SuppressLint;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Outline;
 import android.graphics.PointF;
 import android.graphics.Rect;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.Html;
 import android.text.TextUtils;
@@ -13,6 +15,7 @@ import android.util.DisplayMetrics;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -157,6 +160,7 @@ public class DetailActivity extends BaseActivity {
         llPlayerPlace = findViewById(R.id.previewPlayerPlace);
         llPlayerFragmentContainer = findViewById(R.id.previewPlayer);
         llPlayerFragmentContainerBlock = findViewById(R.id.previewPlayerBlock);
+        applyPreviewRoundCorners();
         ivThumb = findViewById(R.id.ivThumb);
         llPlayerPlace.setVisibility(showPreview ? View.VISIBLE : View.GONE);
         ivThumb.setVisibility(!showPreview ? View.VISIBLE : View.GONE);
@@ -206,8 +210,7 @@ public class DetailActivity extends BaseActivity {
         preFlag = "";
         if (showPreview) {
             playFragment = new PlayFragment();
-            getSupportFragmentManager().beginTransaction().add(R.id.previewPlayer, playFragment).commit();
-            getSupportFragmentManager().beginTransaction().show(playFragment).commitAllowingStateLoss();
+            getSupportFragmentManager().beginTransaction().add(R.id.previewPlayer, playFragment).commitNowAllowingStateLoss();
             tvPlay.setText("全屏");
         }
         llPlayerFragmentContainerBlock.setFocusable(showPreview);
@@ -448,11 +451,16 @@ public class DetailActivity extends BaseActivity {
                         reload = true;
                         isAllowFull = true;
                     }
+                    boolean isCurrentPlaying = !showPreview || isCurrentPreviewPlaying(position);
+                    if (showPreview && !isCurrentPlaying) {
+                        reload = true;
+                        isAllowFull = true;
+                    }
 
                     seriesAdapter.getData().get(vodInfo.playIndex).selected = true;
                     seriesAdapter.notifyItemChanged(vodInfo.playIndex);
                     //选集全屏 想选集不全屏的注释下面一行
-                    if (showPreview && !fullWindows && !isAllowFull && playFragment.getPlayer().isPlaying())toggleFullPreview();
+                    if (showPreview && !fullWindows && isCurrentPlaying && !isAllowFull && playFragment.getPlayer().isPlaying())toggleFullPreview();
                     if (!showPreview || reload) {
                         jumpToPlay();
                         firstReverse=false;
@@ -686,6 +694,33 @@ public class DetailActivity extends BaseActivity {
         return info.replaceAll("\\<.*?\\>", "").replaceAll("\\s", "");
     }
 
+    private void applyPreviewRoundCorners() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return;
+        }
+        final float radius = getResources().getDimension(R.dimen.preview_player_radius);
+        ViewOutlineProvider provider = new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius);
+            }
+        };
+        llPlayerFragmentContainer.setClipToOutline(true);
+        llPlayerFragmentContainer.setOutlineProvider(provider);
+        llPlayerFragmentContainerBlock.setClipToOutline(true);
+        llPlayerFragmentContainerBlock.setOutlineProvider(provider);
+    }
+
+    private void setPreviewRoundClip(boolean enable) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return;
+        }
+        llPlayerFragmentContainer.setClipToOutline(enable);
+        llPlayerFragmentContainerBlock.setClipToOutline(enable);
+        llPlayerFragmentContainer.setBackgroundResource(enable ? R.drawable.preview_player_round : android.R.color.black);
+    }
+
+
     private void initViewModel() {
         sourceViewModel = new ViewModelProvider(this).get(SourceViewModel.class);
         sourceViewModel.detailResult.observe(this, new Observer<AbsXml>() {
@@ -700,6 +735,7 @@ public class DetailActivity extends BaseActivity {
                     }
                     mVideo = absXml.movie.videoList.get(0);
                     mVideo.id = vodId;
+                    if (TextUtils.isEmpty(mVideo.name))mVideo.name = vod_name;
                     if (TextUtils.isEmpty(mVideo.name))mVideo.name = "TVBox";
                     vodInfo = new VodInfo();
                     if((mVideo.pic==null || mVideo.pic.isEmpty()) && !vod_picture.isEmpty()){
@@ -810,10 +846,12 @@ public class DetailActivity extends BaseActivity {
     }
 
     private String  vod_picture="";
+    private String  vod_name="";
     private void initData() {
         Intent intent = getIntent();
         if (intent != null && intent.getExtras() != null) {
             Bundle bundle = intent.getExtras();
+            vod_name=bundle.getString("title", "");
             vod_picture=bundle.getString("picture", "");
             loadDetail(bundle.getString("id", null), bundle.getString("sourceKey", ""));
         }
@@ -870,6 +908,8 @@ public class DetailActivity extends BaseActivity {
         } else if (event.type == RefreshEvent.TYPE_QUICK_SEARCH_SELECT) {
             if (event.obj != null) {
                 Movie.Video video = (Movie.Video) event.obj;
+                vod_name = video.name;
+                vod_picture = video.pic;
                 loadDetail(video.id, video.sourceKey);
             }
         } else if (event.type == RefreshEvent.TYPE_QUICK_SEARCH_WORD_CHANGE) {
@@ -1064,6 +1104,22 @@ public class DetailActivity extends BaseActivity {
         return playingList.get(safeIndex);
     }
 
+    private boolean isCurrentPreviewPlaying(int position) {
+        if (!showPreview || previewVodInfo == null || vodInfo == null || vodInfo.seriesMap == null || TextUtils.isEmpty(vodInfo.playFlag)) {
+            return false;
+        }
+        if (!TextUtils.equals(vodInfo.playFlag, previewVodInfo.playFlag) || previewVodInfo.playIndex != position) {
+            return false;
+        }
+        List<VodInfo.VodSeries> currentList = vodInfo.seriesMap.get(vodInfo.playFlag);
+        if (currentList == null || position < 0 || position >= currentList.size()) {
+            return false;
+        }
+        VodInfo.VodSeries currentSeries = currentList.get(position);
+        VodInfo.VodSeries previewSeries = getPlayingSeries(previewVodInfo, previewVodInfo.playFlag);
+        return currentSeries != null && previewSeries != null && TextUtils.equals(currentSeries.url, previewSeries.url);
+    }
+
     private int findSameEpisodeIndex(VodInfo.VodSeries currentSeries, List<VodInfo.VodSeries> targetList, int fallbackIndex) {
         if (targetList == null || targetList.isEmpty()) {
             return 0;
@@ -1168,7 +1224,10 @@ public class DetailActivity extends BaseActivity {
                 return;
             }
         }
-        if(showPreview && playFragment!=null)playFragment.setPlayTitle(false);
+        if(showPreview && playFragment!=null){
+            playFragment.setPlayTitle(false);
+            playFragment.setExitingPreview(true);
+        }
         super.onBackPressed();
     }
 
@@ -1216,7 +1275,11 @@ public class DetailActivity extends BaseActivity {
             windowsFull = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         }
         fullWindows = !fullWindows;
+        if (playFragment != null) {
+            playFragment.setAutoSwitchLineEnabled(!fullWindows);
+        }
         llPlayerFragmentContainer.setLayoutParams(fullWindows ? windowsFull : windowsPreview);
+        setPreviewRoundClip(!fullWindows);
         llPlayerFragmentContainerBlock.setVisibility(fullWindows ? View.GONE : View.VISIBLE);
         mGridView.setVisibility(fullWindows ? View.GONE : View.VISIBLE);
         mGridViewFlag.setVisibility(fullWindows ? View.GONE : View.VISIBLE);

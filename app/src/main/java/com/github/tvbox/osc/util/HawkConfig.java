@@ -10,6 +10,8 @@ public class HawkConfig {
     public static final String EPG_URL = "epg_url";
     public static final String SHOW_PREVIEW = "show_preview";
     public static final String API_HISTORY = "api_history";
+    public static final String API_LINE_LIST = "api_line_list";
+    public static final String API_LINE_SOURCE = "api_line_source";
     public static final String LIVE_API_HISTORY = "live_api_history";
     public static final String EPG_HISTORY = "epg_history";
     public static final String HOME_API = "home_api";
@@ -21,6 +23,7 @@ public class HawkConfig {
     public static final String LIVE_PLAY_TYPE = "live_play_type";//0 系统 1 ijk 2 exo 10 MXPlayer
     public static final String PLAY_RENDER = "play_render"; //0 texture 2
     public static final String PLAY_SCALE = "play_scale"; //0 texture 2
+    public static final String LIVE_PLAY_SCALE = "live_play_scale";
     public static final String PLAY_TIME_STEP = "play_time_step"; //0 texture 2
     public static final String DOH_URL = "doh_url";
     public static final String HOME_REC = "home_rec"; // 0 豆瓣热播 1 数据源推荐 2 历史
@@ -31,6 +34,7 @@ public class HawkConfig {
     public static final String LIVE_CROSS_GROUP = "live_cross_group";
     public static final String LIVE_CONNECT_TIMEOUT = "live_connect_timeout";
     public static final String LIVE_SHOW_NET_SPEED = "live_show_net_speed";
+    public static final String LIVE_SHOW_RESOLUTION = "live_show_resolution";
     public static final String LIVE_SHOW_TIME = "live_show_time";
     public static final String FAST_SEARCH_MODE = "fast_search_mode";
     public static final String SUBTITLE_TEXT_SIZE = "subtitle_text_size";
@@ -46,9 +50,17 @@ public class HawkConfig {
     public static final String LIVE_GROUP_LIST = "live_group_list";
     public static final String LIVE_API_URL = "live_api_url";
     public static final String M3U8_PURIFY = "m3u8_purify";
+    public static final String AUTO_SWITCH_LINE = "auto_switch_line";
     public static final String SCREEN_DISPLAY = "screen_display";
     public static final String LIVE_WEB_HEADER = "live_web_header";
     public static final String DEFAULT_LOAD_LIVE = "DEFAULT_LOAD_LIVE";
     public static final String SEARCH_HISTORY = "search_history";
+    public static final String DANMU_OPEN = "danmu_open";
+    public static final String DANMU_MAX_LINE = "danmu_max_line";
+    public static final String DANMU_SPEED = "danmu_speed";
+    public static final String DANMU_ALPHA = "danmu_alpha";
+    public static final String DANMU_SIZE_SCALE = "danmu_size_scale";
+    public static final String DANMU_RANDOM_COLOR = "danmu_random_color";
+    public static final String DANMU_API = "danmu_api";
     public static boolean hotVodDelete;
 }
