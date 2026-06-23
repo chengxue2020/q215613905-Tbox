@@ -170,12 +170,20 @@
         android:visibility="gone"
         tools:visibility="visible">
 
-        <LinearLayout
-            android:id="@+id/play_btn_group"
+        <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="@dimen/vs_10"
-            android:orientation="horizontal">
+            android:fillViewport="false"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/play_btn_group"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
 
             <TextView
                 android:singleLine="true"
@@ -424,7 +432,9 @@
                 android:textColor="@android:color/white"
                 android:textSize="@dimen/ts_20"/>
 
-        </LinearLayout>
+            </LinearLayout>
+
+        </HorizontalScrollView>
 
 
         <LinearLayout

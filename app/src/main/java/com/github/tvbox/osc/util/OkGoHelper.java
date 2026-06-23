@@ -273,6 +273,10 @@ public class OkGoHelper {
         return noRedirectClient;
     }
 
+    public static OkHttpClient getItvClient() {
+        return ItvClient;
+    }
+
     public static void init() {
         initDnsOverHttps();
 

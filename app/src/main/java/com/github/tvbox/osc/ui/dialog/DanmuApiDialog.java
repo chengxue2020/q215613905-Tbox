@@ -9,7 +9,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 
 import com.github.tvbox.osc.R;
-import com.github.tvbox.osc.api.ApiConfig;
+import com.github.tvbox.osc.api.DanmakuApi;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.orhanobut.hawk.Hawk;
 
@@ -26,7 +26,7 @@ public class DanmuApiDialog extends BaseDialog {
         input = findViewById(R.id.input);
         input.setText(Hawk.get(HawkConfig.DANMU_API, ""));
         input.setHint(getDefaultApi());
-        findViewById(R.id.inputDefault).setOnClickListener(v -> save(""));
+        findViewById(R.id.inputDefault).setOnClickListener(v -> saveDefault());
         findViewById(R.id.inputSubmit).setOnClickListener(v -> save(input.getText().toString().trim()));
         input.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
@@ -41,13 +41,19 @@ public class DanmuApiDialog extends BaseDialog {
     }
 
     private String getDefaultApi() {
-        String api = ApiConfig.get().getDanmaku();
-        return api.isEmpty() ? "请输入弹幕地址" : api;
+        String api = DanmakuApi.getDisplayApiUrl();
+        return api.isEmpty() ? "请输入弹幕搜索地址" : api;
     }
 
     private void save(String api) {
-        Hawk.put(HawkConfig.DANMU_API, api);
+        DanmakuApi.setCustomApi(api);
         if (listener != null) listener.onChange(api);
+        dismiss();
+    }
+
+    private void saveDefault() {
+        DanmakuApi.setUseDefault(true);
+        if (listener != null) listener.onChange("");
         dismiss();
     }
 

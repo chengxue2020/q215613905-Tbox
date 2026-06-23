@@ -9,6 +9,7 @@ import android.text.TextUtils;
 import com.github.tvbox.osc.event.RefreshEvent;
 import com.github.tvbox.osc.receiver.SearchReceiver;
 import com.github.tvbox.osc.util.HawkConfig;
+import com.github.tvbox.osc.util.HistoryHelper;
 import com.orhanobut.hawk.Hawk;
 
 import org.greenrobot.eventbus.EventBus;
@@ -49,11 +50,17 @@ public class ControlManager {
     }
 
     public String getAddress(boolean local) {
+        if (mServer == null || !mServer.isStarting()) {
+            startServer();
+        }
+        if (mServer == null || !mServer.isStarting()) {
+            return "";
+        }
         return local ? mServer.getLoadAddress() : mServer.getServerAddress();
     }
 
     public void startServer() {
-        if (mServer != null) {
+        if (mServer != null && mServer.isStarting()) {
             return;
         }
         do {
@@ -79,12 +86,28 @@ public class ControlManager {
                 }
 
                 @Override
+                public void onLiveApiReceived(String url) {
+                    if (!TextUtils.isEmpty(url)) {
+                        Hawk.put(HawkConfig.LIVE_API_URL, url);
+                        HistoryHelper.setLiveApiHistory(url);
+                    }
+                    EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_LIVE_API_URL_CHANGE, url));
+                }
+
+                @Override
+                public void onDanmuApiReceived(String url) {
+                    Hawk.put(HawkConfig.DANMU_API, TextUtils.isEmpty(url) ? "" : url);
+                    EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_SET_DANMU_SETTINGS, false));
+                }
+
+                @Override
                 public void onPushReceived(String url) {
                     EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_PUSH_URL, url));
                 }
             });
             try {
                 mServer.start();
+                com.github.catvod.Proxy.set(RemoteServer.serverPort);
                 IjkMediaPlayer.setDotPort(Hawk.get(HawkConfig.DOH_URL, 0) > 0, RemoteServer.serverPort);
                 break;
             } catch (IOException ex) {
@@ -98,5 +121,6 @@ public class ControlManager {
         if (mServer != null && mServer.isStarting()) {
             mServer.stop();
         }
+        mServer = null;
     }
 }

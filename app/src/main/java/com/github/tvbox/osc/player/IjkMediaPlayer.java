@@ -68,7 +68,7 @@ public class IjkMediaPlayer extends IjkPlayer {
         mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_timeout", -1);
         mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT,"safe",0);
 
-        if(Hawk.get(HawkConfig.PLAYER_IS_LIVE)){
+        if(Hawk.get(HawkConfig.PLAYER_IS_LIVE, false)){
             LOG.i("echo-type-直播");
             mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_PLAYER, "max_cached_duration", 300);
             mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT, "flush_packets", 1);

@@ -74,6 +74,9 @@
         <activity
             android:name=".ui.activity.CollectActivity"
             android:screenOrientation="sensorLandscape" />
+        <activity
+            android:name=".ui.activity.LocalFileActivity"
+            android:screenOrientation="sensorLandscape" />
 
         <receiver
             android:name=".receiver.SearchReceiver"

@@ -725,6 +725,7 @@ public class FastSearchActivity extends BaseActivity {
             finishSearchIfDone();
             return;
         }
+        currentSearchToken = String.valueOf(searchTokenSeq.incrementAndGet());
         waitingSearchTasks.clear();
         startedSearchKeys.clear();
         releasedSearchKeys.clear();
@@ -757,6 +758,7 @@ public class FastSearchActivity extends BaseActivity {
             searchPaused = allRunCount.get() > 0;
             if (searchPaused) {
                 cancel();
+                currentSearchToken = "";
             }
             updateSearchStatus();
         } catch (Throwable th) {

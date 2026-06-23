@@ -1,8 +1,15 @@
 package com.github.catvod.crawler;
 
+import android.app.Activity;
+import android.content.Context;
+import android.content.pm.ActivityInfo;
+import android.content.res.Configuration;
 import android.util.Base64;
+import android.view.Surface;
+import android.view.WindowManager;
 
 import com.github.tvbox.osc.server.ControlManager;
+import com.github.tvbox.osc.base.App;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -46,6 +53,28 @@ public class SpiderApi {
         try {
             SpiderDebug.log(msg);
         } catch (Throwable ignored) {
+        }
+    }
+
+    public int getScreenOrientation() {
+        try {
+            Activity activity = App.getInstance().getCurrentActivity();
+            Context context = activity == null ? App.getInstance() : activity;
+            int orientation = context.getResources().getConfiguration().orientation;
+            int rotation = Surface.ROTATION_0;
+            WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+            if (windowManager != null && windowManager.getDefaultDisplay() != null) {
+                rotation = windowManager.getDefaultDisplay().getRotation();
+            }
+            if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+                return ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
+            }
+            if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                return rotation == Surface.ROTATION_90 ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE;
+            }
+            return ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
+        } catch (Throwable th) {
+            return ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE;
         }
     }
 

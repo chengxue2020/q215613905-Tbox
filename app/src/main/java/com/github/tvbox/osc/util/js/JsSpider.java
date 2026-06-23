@@ -37,6 +37,23 @@ import java.util.concurrent.Future;
 
 public class JsSpider extends Spider {
 
+    private static final String EMPTY_MODULE_CODE =
+            "const empty = null;\n" +
+            "export default empty;\n" +
+            "export const JSEncrypt = empty;\n" +
+            "export const NodeRSA = empty;\n" +
+            "export const pako = empty;\n" +
+            "export const JSON5 = empty;\n" +
+            "export const mb = empty;\n" +
+            "export const parse = empty;\n" +
+            "export const stringify = empty;\n" +
+            "export const inflate = empty;\n" +
+            "export const deflate = empty;\n" +
+            "export const gzip = empty;\n" +
+            "export const ungzip = empty;\n" +
+            "export const encrypt = empty;\n" +
+            "export const decrypt = empty;";
+
     private final ExecutorService executor;
     private final Class<?> dex;
     private QuickJSContext ctx;
@@ -44,6 +61,7 @@ public class JsSpider extends Spider {
     private final String key;
     private final String api;
     private boolean cat;
+    private byte[] emptyModuleBytecode;
 
     public JsSpider(String key, String api, Class<?> cls) throws Exception {
         this.key = "J" + MD5.encode(key);
@@ -151,6 +169,15 @@ public class JsSpider extends Spider {
     }
 
     @Override
+    public String liveContent(String url) {
+        try {
+            return (String) call("live", url);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    @Override
     public boolean manualVideoCheck()  {
         try {
             return (Boolean) call("sniffer");
@@ -180,6 +207,15 @@ public class JsSpider extends Spider {
     }
 
     @Override
+    public String action(String action) {
+        try {
+            return (String) call("action", action);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    @Override
     public void destroy() {
         submit(() -> {
             executor.shutdownNow();
@@ -196,20 +232,20 @@ public class JsSpider extends Spider {
             "    } else if (spider.default) {\n" +
             "        globalThis.__JS_SPIDER__ = typeof spider.default === 'function' ? spider.default() : spider.default\n" +
             "    }\n" +
-            "}";
+            "}\n";
     private void initializeJS() throws Exception {
         submit(() -> {
             if (ctx == null) createCtx();
             if (dex != null) createDex();
 
             String content = FileUtils.loadModule(api);            
-            if (TextUtils.isEmpty(content)) {return null;}
+            if (isInvalidModuleContent(content)) {return null;}
             
             if(content.startsWith("//bb")){
                 cat = true;
                 byte[] b = Base64.decode(content.replace("//bb",""), 0);
                 ctx.execute(byteFF(b), key + ".js");
-                ctx.evaluateModule(String.format(SPIDER_STRING_CODE, key + ".js") + "globalThis." + key + " = __JS_SPIDER__;", "tv_box_root.js");
+                ctx.evaluateModule(String.format(SPIDER_STRING_CODE, key + ".js") + "globalThis." + key + " = globalThis.__JS_SPIDER__;", "tv_box_root.js");
                 //ctx.execute(byteFF(b), key + ".js","__jsEvalReturn");
                 //ctx.evaluate("globalThis." + key + " = __JS_SPIDER__;");
             } else {
@@ -222,7 +258,7 @@ public class JsSpider extends Spider {
                     cat = true;
                 }
                 ctx.evaluateModule(content, api);
-                ctx.evaluateModule(String.format(SPIDER_STRING_CODE, api) + "globalThis." + key + " = __JS_SPIDER__;", "tv_box_root.js");
+                ctx.evaluateModule(String.format(SPIDER_STRING_CODE, api) + "globalThis." + key + " = globalThis.__JS_SPIDER__;", "tv_box_root.js");
                 //ctx.evaluateModule(content, api, moduleExtName);
                 //ctx.evaluate("globalThis." + key + " = __JS_SPIDER__;");                
             }
@@ -240,13 +276,13 @@ public class JsSpider extends Spider {
 
     private void createCtx() {
         ctx = QuickJSContext.create();
+        emptyModuleBytecode = ctx.compileModule(EMPTY_MODULE_CODE, "empty.js");
         ctx.setModuleLoader(new QuickJSContext.BytecodeModuleLoader() {
             @Override
             public byte[] getModuleBytecode(String moduleName) {
                 String ss = FileUtils.loadModule(moduleName);
-                if (TextUtils.isEmpty(ss)) {
-                    LOG.i("echo-getModuleBytecode empty :"+ moduleName);
-                    return ctx.compileModule("", moduleName);
+                if (isInvalidModuleContent(ss)) {
+                    return compileEmptyModule(moduleName);
                 }
                 if(ss.startsWith("//DRPY")){
                     return Base64.decode(ss.replace("//DRPY",""), Base64.URL_SAFE);
@@ -254,12 +290,7 @@ public class JsSpider extends Spider {
                     byte[] b = Base64.decode(ss.replace("//bb",""), 0);
                     return byteFF(b);
                 } else {
-                    if (moduleName.contains("cheerio.min.js")) {
-                        FileUtils.setCacheByte("cheerio.min", ctx.compileModule(ss, "cheerio.min.js"));
-                    } else if (moduleName.contains("crypto-js.js")) {
-                        FileUtils.setCacheByte("crypto-js", ctx.compileModule(ss, "crypto-js.js"));
-                    }
-                    return ctx.compileModule(ss, moduleName);
+                    return compileModule(moduleName, ss);
                 }
             }
 
@@ -281,7 +312,54 @@ public class JsSpider extends Spider {
         ctx.getGlobalObject().set("local", local);
         local.bind(new local());
 
-        ctx.getGlobalObject().getContext().evaluate(FileUtils.loadModule("net.js"));
+        String net = FileUtils.loadModule("net.js");
+        if (!isInvalidModuleContent(net)) ctx.getGlobalObject().getContext().evaluate(net);
+        preloadTemplate();
+    }
+
+    private byte[] compileEmptyModule(String moduleName) {
+        LOG.i("echo-getModuleBytecode empty :" + moduleName);
+        return emptyModuleBytecode;
+    }
+
+    private byte[] compileModule(String moduleName, String content) {
+        try {
+            if (moduleName != null && moduleName.contains("cheerio.min.js")) {
+                byte[] bytecode = ctx.compileModule(content, "cheerio.min.js");
+                FileUtils.setCacheByte("cheerio.min", bytecode);
+                return bytecode;
+            } else if (moduleName != null && moduleName.contains("crypto-js.js")) {
+                byte[] bytecode = ctx.compileModule(content, "crypto-js.js");
+                FileUtils.setCacheByte("crypto-js", bytecode);
+                return bytecode;
+            }
+            return ctx.compileModule(content, moduleName);
+        } catch (Throwable th) {
+            LOG.i("echo-compileModule-error " + moduleName + ", msg=" + th.getMessage());
+            return compileEmptyModule(moduleName);
+        }
+    }
+
+    private boolean isInvalidModuleContent(String content) {
+        if (TextUtils.isEmpty(content)) return true;
+        String trim = content.trim();
+        if (trim.startsWith("\uFEFF")) trim = trim.substring(1).trim();
+        String lower = trim.toLowerCase();
+        return lower.startsWith("<")
+                || lower.startsWith("{\"code\":404")
+                || lower.startsWith("404")
+                || lower.startsWith("not found");
+    }
+
+    private void preloadTemplate() {
+        try {
+            String template = "import tpl from '模板.js';\n"
+                    + "globalThis.muban = tpl.muban;\n"
+                    + "globalThis.getMubans = tpl.getMubans;";
+            ctx.evaluateModule(template, "tv_box_template.js");
+        } catch (Throwable th) {
+            LOG.i("echo-preloadTemplate-error " + th.getMessage());
+        }
     }
 
     private void createDex() {
@@ -333,7 +411,7 @@ public class JsSpider extends Spider {
     private String getContent() {
         String global = "globalThis." + key;
         String content = FileUtils.loadModule(api);
-        if (TextUtils.isEmpty(content)) {return null;}
+        if (isInvalidModuleContent(content)) {return null;}
         if (content.contains("__jsEvalReturn")) {
             ctx.evaluate("req = http");
             return content.concat(global).concat(" = __jsEvalReturn()");

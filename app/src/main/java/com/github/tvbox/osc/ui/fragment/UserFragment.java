@@ -10,6 +10,8 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.github.tvbox.osc.R;
@@ -33,6 +35,7 @@ import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.ImgUtil;
 import com.github.tvbox.osc.util.UA;
+import com.github.tvbox.osc.viewmodel.SourceViewModel;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -48,6 +51,7 @@ import com.owen.tvrecyclerview.widget.V7LinearLayoutManager;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -68,6 +72,7 @@ public class UserFragment extends BaseLazyFragment implements View.OnClickListen
     public static HomeHotVodAdapter homeHotVodAdapter;
     private List<Movie.Video> homeSourceRec;
     public static TvRecyclerView tvHotList;
+    private SourceViewModel sourceViewModel;
 
     public static UserFragment newInstance() {
         return new UserFragment();
@@ -151,6 +156,7 @@ public class UserFragment extends BaseLazyFragment implements View.OnClickListen
     @Override
     protected void init() {
         EventBus.getDefault().register(this);
+        sourceViewModel = new ViewModelProvider(this).get(SourceViewModel.class);
         tvLive = findViewById(R.id.tvLive);
         tvSearch = findViewById(R.id.tvSearch);
         tvSetting = findViewById(R.id.tvSetting);
@@ -186,7 +192,12 @@ public class UserFragment extends BaseLazyFragment implements View.OnClickListen
                 if (ApiConfig.get().getSourceBeanList().isEmpty())
                     return;
                 Movie.Video vod = ((Movie.Video) adapter.getItem(position));
-                
+
+                if (Hawk.get(HawkConfig.HOME_REC, 0) == 1 && homeSourceRec != null && vod.action != null) {
+                    sourceViewModel.action(vod.sourceKey, vod.action);
+                    return;
+                }
+
                 if ((vod.id != null && !vod.id.isEmpty()) && (Hawk.get(HawkConfig.HOME_REC, 0) == 2) && HawkConfig.hotVodDelete) {
                     homeHotVodAdapter.remove(position);
                     VodInfo vodInfo = RoomDataManger.getVodInfo(vod.sourceKey, vod.id);
@@ -250,6 +261,14 @@ public class UserFragment extends BaseLazyFragment implements View.OnClickListen
         tvHotList.setAdapter(homeHotVodAdapter);
 
         initHomeHotVod(homeHotVodAdapter);
+        sourceViewModel.actionResult.observe(this, new Observer<JSONObject>() {
+            @Override
+            public void onChanged(JSONObject jsonObject) {
+                if (jsonObject == null) return;
+                String msg = jsonObject.optString("msg");
+                if (!msg.isEmpty()) Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void initHomeHotVod(HomeHotVodAdapter adapter) {

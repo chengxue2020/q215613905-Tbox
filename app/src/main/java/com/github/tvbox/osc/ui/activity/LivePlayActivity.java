@@ -96,7 +96,6 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Hashtable;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -1026,7 +1025,9 @@ public class LivePlayActivity extends BaseActivity {
         String channelNameReal = normalizeEpgChannelName(getFirstPartBeforeSpace(channelName));
         String epgTagName = channelNameReal;
         String iconUrl = null;
-        if (logoUrl == null || logoUrl.isEmpty()) {
+        if (!channel_Name.getChannelLogo().isEmpty()) {
+            iconUrl = channel_Name.getChannelLogo();
+        } else if (logoUrl == null || logoUrl.isEmpty()) {
             String[] epgInfo = EpgUtil.getEpgInfo(channelNameReal);
             if (epgInfo != null) {
                 iconUrl = epgInfo[0];
@@ -1572,6 +1573,34 @@ public class LivePlayActivity extends BaseActivity {
         return Hawk.get(HawkConfig.LIVE_WEB_HEADER);
     }
 
+    private HashMap<String, String> liveChannelHeader() {
+        if (currentLiveChannelItem == null) return liveWebHeader();
+        HashMap<String, String> header = new HashMap<>();
+        HashMap<String, String> liveHeader = liveWebHeader();
+        if (liveHeader != null) header.putAll(liveHeader);
+        if (currentLiveChannelItem.getHeaders() != null) {
+            header.putAll(currentLiveChannelItem.getHeaders());
+        }
+        if (header.isEmpty()) return null;
+        return header;
+    }
+
+    private boolean currentChannelHasCatchup() {
+        return currentLiveChannelItem != null && currentLiveChannelItem.hasCatchup();
+    }
+
+    private JsonObject currentCatchup() {
+        if (currentChannelHasCatchup()) return currentLiveChannelItem.getChannelCatchup();
+        return catchup;
+    }
+
+    private boolean hasCurrentCatchupTemplate() {
+        JsonObject obj = currentCatchup();
+        return obj != null && obj.has("source") && obj.has("replace")
+                && !obj.get("source").getAsString().isEmpty()
+                && !obj.get("replace").getAsString().isEmpty();
+    }
+
     private void showSwitchChannelSnapshot() {
         if (switchChannelSnapshotImage != null && mVideoView != null) {
             Bitmap bitmap = null;
@@ -1623,7 +1652,7 @@ public class LivePlayActivity extends BaseActivity {
         epgListAdapter.setSelectedEpgIndex(-1);
         isSHIYI=false;
         isBack = false;
-        if(hasCatchup || currentLiveChannelItem.getUrl().contains("PLTV/") || currentLiveChannelItem.getUrl().contains("TVOD/")){
+        if(hasCatchup || currentChannelHasCatchup() || currentLiveChannelItem.getUrl().contains("PLTV/") || currentLiveChannelItem.getUrl().contains("TVOD/")){
             currentLiveChannelItem.setinclude_back(true);
         }else {
             currentLiveChannelItem.setinclude_back(false);
@@ -1633,14 +1662,14 @@ public class LivePlayActivity extends BaseActivity {
         backcontroller.setVisibility(View.GONE);
         ll_right_top_huikan.setVisibility(View.GONE);
         if(mVideoView!=null){
-            if(liveWebHeader()!=null)LOG.i("echo-"+liveWebHeader().toString());
+            if(liveChannelHeader()!=null)LOG.i("echo-"+liveChannelHeader().toString());
             if (showPreviousFrame) {
                 showSwitchChannelSnapshot();
             } else {
                 hideSwitchChannelSnapshot();
             }
             mVideoView.release();
-            mVideoView.setUrl(currentLiveChannelItem.getUrl(),liveWebHeader());
+            mVideoView.setUrl(currentLiveChannelItem.getUrl(),liveChannelHeader());
             mVideoView.start();
             showResolutionAfterChannelSwitch();
         }
@@ -1821,7 +1850,7 @@ public class LivePlayActivity extends BaseActivity {
                 if (now.compareTo(selectedData.startdateTime) >= 0 && now.compareTo(selectedData.enddateTime) <= 0) {
                     mVideoView.release();
                     isSHIYI = false;
-                    mVideoView.setUrl(currentLiveChannelItem.getUrl(),liveWebHeader());
+                    mVideoView.setUrl(currentLiveChannelItem.getUrl(),liveChannelHeader());
                     mVideoView.start();
                     epgListAdapter.setShiyiSelection(-1, false,timeFormat.format(date));
                     epgListAdapter.notifyDataSetChanged();
@@ -1831,7 +1860,7 @@ public class LivePlayActivity extends BaseActivity {
                 String shiyiUrl = currentLiveChannelItem.getUrl();
                 if (now.compareTo(selectedData.startdateTime) < 0) {
 
-                } else if(hasCatchup || shiyiUrl.contains("PLTV/") || shiyiUrl.contains("TVOD/")){
+                } else if(hasCatchup || currentChannelHasCatchup() || shiyiUrl.contains("PLTV/") || shiyiUrl.contains("TVOD/")){
                     shiyiUrl=shiyiUrl.replaceAll("/PLTV/", "/TVOD/");
                     mHandler.removeCallbacks(mHideChannelListRun);
                     mHandler.postDelayed(mHideChannelListRun, 100);
@@ -1839,9 +1868,10 @@ public class LivePlayActivity extends BaseActivity {
                     shiyi_time = shiyiStartdate + "-" + shiyiEnddate;
                     isSHIYI = true;
                     //mCanSeek=true;
-                    if(hasCatchup){
-                        String replace=catchup.get("replace").getAsString();
-                        String source=catchup.get("source").getAsString();
+                    if(hasCurrentCatchupTemplate()){
+                        JsonObject catchupObj = currentCatchup();
+                        String replace=catchupObj.get("replace").getAsString();
+                        String source=catchupObj.get("source").getAsString();
                         String[] parts = replace.split(",");
                         String left = parts.length > 0 ? parts[0].trim() : "";
                         String right = parts.length > 1 ? parts[1].trim() : "";
@@ -1881,7 +1911,7 @@ public class LivePlayActivity extends BaseActivity {
                     LOG.i("echo-回看地址playUrl :"+ shiyiUrl);
                     playUrl = shiyiUrl;
 
-                    mVideoView.setUrl(playUrl,liveWebHeader());
+                    mVideoView.setUrl(playUrl,liveChannelHeader());
                     mVideoView.start();
                     epgListAdapter.setShiyiSelection(position, true, timeFormat.format(date));
                     epgListAdapter.notifyDataSetChanged();
@@ -1933,7 +1963,7 @@ public class LivePlayActivity extends BaseActivity {
                 if (now.compareTo(selectedData.startdateTime) >= 0 && now.compareTo(selectedData.enddateTime) <= 0) {
                     mVideoView.release();
                     isSHIYI = false;
-                    mVideoView.setUrl(currentLiveChannelItem.getUrl(),liveWebHeader());
+                    mVideoView.setUrl(currentLiveChannelItem.getUrl(),liveChannelHeader());
                     mVideoView.start();
                     epgListAdapter.setShiyiSelection(-1, false,timeFormat.format(date));
                     epgListAdapter.notifyDataSetChanged();
@@ -1943,7 +1973,7 @@ public class LivePlayActivity extends BaseActivity {
                 String shiyiUrl = currentLiveChannelItem.getUrl();
                 if (now.compareTo(selectedData.startdateTime) < 0) {
 
-                } else if(hasCatchup || shiyiUrl.contains("PLTV/") || shiyiUrl.contains("TVOD/")){
+                } else if(hasCatchup || currentChannelHasCatchup() || shiyiUrl.contains("PLTV/") || shiyiUrl.contains("TVOD/")){
                     shiyiUrl = shiyiUrl.replaceAll("/PLTV/", "/TVOD/");
                     mHandler.removeCallbacks(mHideChannelListRun);
                     mHandler.postDelayed(mHideChannelListRun, 100);
@@ -1951,9 +1981,10 @@ public class LivePlayActivity extends BaseActivity {
                     shiyi_time = shiyiStartdate + "-" + shiyiEnddate;
                     isSHIYI = true;
                     //mCanSeek=true;
-                    if(hasCatchup){
-                       String replace=catchup.get("replace").getAsString();
-                       String source=catchup.get("source").getAsString();
+                    if(hasCurrentCatchupTemplate()){
+                       JsonObject catchupObj = currentCatchup();
+                       String replace=catchupObj.get("replace").getAsString();
+                       String source=catchupObj.get("source").getAsString();
                        String[] parts = replace.split(",");
                        String left = parts.length > 0 ? parts[0].trim() : "";
                        String right = parts.length > 1 ? parts[1].trim() : "";
@@ -1992,8 +2023,8 @@ public class LivePlayActivity extends BaseActivity {
 
                     LOG.i("echo-回看地址playUrl :"+ shiyiUrl);
                     playUrl = shiyiUrl;
-                    if(liveWebHeader()!=null)LOG.i("echo-liveWebHeader :"+ liveWebHeader().toString());
-                    mVideoView.setUrl(playUrl,liveWebHeader());
+                    if(liveChannelHeader()!=null)LOG.i("echo-liveWebHeader :"+ liveChannelHeader().toString());
+                    mVideoView.setUrl(playUrl,liveChannelHeader());
                     mVideoView.start();
                     epgListAdapter.setShiyiSelection(position, true,timeFormat.format(date));
                     epgListAdapter.notifyDataSetChanged();
@@ -2202,7 +2233,7 @@ public class LivePlayActivity extends BaseActivity {
         }
         LOG.i("echo-liveAutoRetry switch player and replay current url");
         allowLiveSwitchPlayer = false;
-        mVideoView.setUrl(currentLiveChannelItem.getUrl(), liveWebHeader());
+        mVideoView.setUrl(currentLiveChannelItem.getUrl(), liveChannelHeader());
         mVideoView.start();
         return true;
     }
@@ -2480,7 +2511,7 @@ public class LivePlayActivity extends BaseActivity {
             case 2://播放解码
                 mVideoView.release();
                 livePlayerManager.changeLivePlayerType(mVideoView, position, currentLiveChannelItem.getChannelName());
-                mVideoView.setUrl(currentLiveChannelItem.getUrl(),liveWebHeader());
+                mVideoView.setUrl(currentLiveChannelItem.getUrl(),liveChannelHeader());
                 mVideoView.start();
                 break;
             case 3://超时换源
@@ -2606,9 +2637,7 @@ public class LivePlayActivity extends BaseActivity {
                             });
                             return;
                         }
-                        LinkedHashMap<String, LinkedHashMap<String, ArrayList<String>>> linkedHashMap = new LinkedHashMap<>();
-                        TxtSubscribe.parse(linkedHashMap, sortJson);
-                        JsonArray livesArray = TxtSubscribe.live2JsonArray(linkedHashMap);
+                        JsonArray livesArray = TxtSubscribe.parseToJsonArray(sortJson);
 
                         ApiConfig.get().loadLives(livesArray);
                         List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
@@ -2651,9 +2680,7 @@ public class LivePlayActivity extends BaseActivity {
 
                 @Override
                 public void onSuccess(Response<String> response) {
-                    LinkedHashMap<String, LinkedHashMap<String, ArrayList<String>>> linkedHashMap = new LinkedHashMap<>();
-                    TxtSubscribe.parse(linkedHashMap, response.body());
-                    JsonArray livesArray = TxtSubscribe.live2JsonArray(linkedHashMap);
+                    JsonArray livesArray = TxtSubscribe.parseToJsonArray(response.body());
 
                     ApiConfig.get().loadLives(livesArray);
                     List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();

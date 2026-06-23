@@ -1,167 +1,368 @@
 package com.github.tvbox.osc.util.live;
 
+import com.github.tvbox.osc.util.DefaultConfig;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.io.BufferedReader;
 import java.io.StringReader;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class TxtSubscribe {
     private static final Pattern NAME_PATTERN = Pattern.compile(".*,(.+?)$");
     private static final Pattern GROUP_PATTERN = Pattern.compile("group-title=\"(.*?)\"");
+    private static final Pattern TVG_CHNO_PATTERN = Pattern.compile("tvg-chno=\"(.*?)\"");
+    private static final Pattern TVG_LOGO_PATTERN = Pattern.compile("tvg-logo=\"(.*?)\"");
+    private static final Pattern TVG_NAME_PATTERN = Pattern.compile("tvg-name=\"(.*?)\"");
+    private static final Pattern TVG_URL_PATTERN = Pattern.compile("tvg-url=\"(.*?)\"");
+    private static final Pattern TVG_ID_PATTERN = Pattern.compile("tvg-id=\"(.*?)\"");
+    private static final Pattern HTTP_USER_AGENT_PATTERN = Pattern.compile("http-user-agent=\"(.*?)\"");
+    private static final Pattern CATCHUP_PATTERN = Pattern.compile("catchup=\"(.*?)\"");
+    private static final Pattern CATCHUP_SOURCE_PATTERN = Pattern.compile("catchup-source=\"(.*?)\"");
+    private static final Pattern CATCHUP_REPLACE_PATTERN = Pattern.compile("catchup-replace=\"(.*?)\"");
 
     public static void parse(LinkedHashMap<String, LinkedHashMap<String, ArrayList<String>>> linkedHashMap, String str) {
-        if (str.startsWith("#EXTM3U")) {
-            parseM3u(linkedHashMap, str);
-        } else {
-            parseTxt(linkedHashMap, str);
-        }
-    }
-
-    //解析m3u后缀
-    private static void parseM3u(LinkedHashMap<String, LinkedHashMap<String, ArrayList<String>>> linkedHashMap, String str) {
-        ArrayList<String> urls;
-        try {
-            BufferedReader bufferedReader = new BufferedReader(new StringReader(str));
-            LinkedHashMap<String, ArrayList<String>> linkedHashMap2 = new LinkedHashMap<>();
-            LinkedHashMap<String, ArrayList<String>> channelTemp = linkedHashMap2;
-            String line;
-            while ((line = bufferedReader.readLine()) != null) {
-                if (line.equals("")) continue;
-                if (line.startsWith("#EXTM3U")) continue;
-                if (isSetting(line)) continue;
-                if (line.startsWith("#EXTINF") || line.contains("#EXTINF")) {
-                    String name = getStrByRegex(NAME_PATTERN, line);
-                    String group = getStrByRegex(GROUP_PATTERN, line);
-                    String url = bufferedReader.readLine().trim();
-                    if (isUrl(url)) {
-                        if (linkedHashMap.containsKey(group)) {
-                            channelTemp = linkedHashMap.get(group);
-                        } else {
-                            channelTemp = new LinkedHashMap<>();
-                            linkedHashMap.put(group, channelTemp);
+        linkedHashMap.clear();
+        JsonArray array = parseToJsonArray(str);
+        if (array == null) return;
+        for (JsonElement groupElement : array) {
+            JsonObject groupObj = groupElement.getAsJsonObject();
+            String groupName = DefaultConfig.safeJsonString(groupObj, "group", "Ungrouped");
+            LinkedHashMap<String, ArrayList<String>> channelMap = new LinkedHashMap<>();
+            if (groupObj.has("channels")) {
+                for (JsonElement channelElement : groupObj.getAsJsonArray("channels")) {
+                    JsonObject channelObj = channelElement.getAsJsonObject();
+                    String channelName = DefaultConfig.safeJsonString(channelObj, "name", "Unnamed");
+                    ArrayList<String> urls = new ArrayList<String>();
+                    if (channelObj.has("urls")) {
+                        for (JsonElement urlElement : channelObj.getAsJsonArray("urls")) {
+                            String url = urlElement.getAsString().trim();
+                            if (isUrl(url) && !urls.contains(url)) urls.add(url);
                         }
-                        if (null != channelTemp && channelTemp.containsKey(name)) {
-                            urls = channelTemp.get(name);
-                        } else {
-                            urls = new ArrayList<>();
-                            channelTemp.put(name, urls);
-                        }
-                        if (null != urls && !urls.contains(url)) urls.add(url);
                     }
+                    if (!urls.isEmpty()) channelMap.put(channelName, urls);
                 }
             }
-            bufferedReader.close();
-            if (linkedHashMap2.isEmpty()) return;
-            linkedHashMap.put("未分组", linkedHashMap2);
-        } catch (Exception e) {
-            e.printStackTrace();
+            if (!channelMap.isEmpty()) linkedHashMap.put(groupName, channelMap);
         }
     }
-    private static String getStrByRegex(Pattern pattern, String line) {
-        Matcher matcher = pattern.matcher(line);
-        if (matcher.find()) return matcher.group(1);
-        return pattern.pattern().equals(GROUP_PATTERN.pattern()) ? "未分组" : "未命名";
+
+    public static JsonArray parseToJsonArray(String str) {
+        if (str == null) return new JsonArray();
+        str = str.trim();
+        if (str.isEmpty()) return new JsonArray();
+        try {
+            JsonElement element = JsonParser.parseString(str);
+            if (element.isJsonArray()) return normalizeJsonArray(element.getAsJsonArray());
+        } catch (Throwable ignored) {
+        }
+        if (str.startsWith("#EXTM3U")) return parseM3uToJsonArray(str);
+        return parseTxtToJsonArray(str);
     }
 
-    private static boolean isUrl(String url) {
-        return !url.isEmpty() && (url.startsWith("http") || url.startsWith("rtp") || url.startsWith("rtsp") || url.startsWith("rtmp"));
+    private static JsonArray normalizeJsonArray(JsonArray groups) {
+        JsonArray result = new JsonArray();
+        for (JsonElement groupElement : groups) {
+            JsonObject groupObj = groupElement.getAsJsonObject();
+            JsonObject outGroup = new JsonObject();
+            outGroup.addProperty("group", DefaultConfig.safeJsonString(groupObj, "group", "Ungrouped"));
+            if (groupObj.has("channels")) {
+                for (JsonElement channelElement : groupObj.getAsJsonArray("channels")) {
+                    JsonObject channelObj = channelElement.getAsJsonObject();
+                    JsonObject outChannel = new JsonObject();
+                    copyIfExists(channelObj, outChannel, "name");
+                    copyIfExists(channelObj, outChannel, "urls");
+                    copyIfExists(channelObj, outChannel, "logo");
+                    copyIfExists(channelObj, outChannel, "epg");
+                    copyIfExists(channelObj, outChannel, "ua");
+                    copyIfExists(channelObj, outChannel, "click");
+                    copyIfExists(channelObj, outChannel, "format");
+                    copyIfExists(channelObj, outChannel, "origin");
+                    copyIfExists(channelObj, outChannel, "referer");
+                    copyIfExists(channelObj, outChannel, "tvg-id");
+                    copyIfExists(channelObj, outChannel, "tvg-name");
+                    copyIfExists(channelObj, outChannel, "tvg-chno");
+                    copyIfExists(channelObj, outChannel, "parse");
+                    copyIfExists(channelObj, outChannel, "header");
+                    copyIfExists(channelObj, outChannel, "catchup");
+                    copyIfExists(channelObj, outChannel, "catchup-source");
+                    copyIfExists(channelObj, outChannel, "catchup-replace");
+                    addChannel(outGroup, outChannel);
+                }
+            }
+            if (!outGroup.has("channels")) outGroup.add("channels", new JsonArray());
+            result.add(outGroup);
+        }
+        return result;
+    }
+
+    private static void copyIfExists(JsonObject src, JsonObject dst, String key) {
+        if (src.has(key)) dst.add(key, src.get(key));
+    }
+
+    private static JsonArray parseM3uToJsonArray(String str) {
+        JsonArray result = new JsonArray();
+        try {
+            BufferedReader reader = new BufferedReader(new StringReader(str.replace("\r\n", "\n").replace("\r", "")));
+            String line;
+            JsonObject currentGroup = null;
+            JsonObject pendingChannel = null;
+            JsonObject pendingMeta = new JsonObject();
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty()) continue;
+                if (line.startsWith("#EXTM3U")) {
+                    mergeMeta(pendingMeta, buildMeta(line));
+                    continue;
+                }
+                if (isSetting(line)) {
+                    mergeMeta(pendingMeta, buildSetting(line));
+                    continue;
+                }
+                if (line.startsWith("#EXTINF") || line.contains("#EXTINF")) {
+                    String groupName = get(line, GROUP_PATTERN);
+                    if (groupName.isEmpty()) groupName = "Ungrouped";
+                    currentGroup = findOrCreateGroup(result, groupName);
+                    pendingChannel = new JsonObject();
+                    pendingChannel.addProperty("name", get(line, NAME_PATTERN));
+                    mergeMeta(pendingChannel, buildMeta(line));
+                    mergeMeta(pendingChannel, pendingMeta);
+                    pendingMeta = new JsonObject();
+                    continue;
+                }
+                if (line.startsWith("#")) continue;
+                if (currentGroup == null) currentGroup = findOrCreateGroup(result, "Ungrouped");
+                if (pendingChannel == null) pendingChannel = new JsonObject();
+                String[] parts = line.split("\\|", 2);
+                String url = parts[0].trim();
+                if (!isUrl(url)) continue;
+                if (parts.length > 1) mergeMeta(pendingMeta, parseHeaderString(parts[1]));
+                mergeMeta(pendingChannel, pendingMeta);
+                JsonArray urls = pendingChannel.has("urls") ? pendingChannel.getAsJsonArray("urls") : new JsonArray();
+                if (!containsUrl(urls, url)) urls.add(url);
+                pendingChannel.add("urls", urls);
+                addChannel(currentGroup, pendingChannel);
+                pendingChannel = null;
+                pendingMeta = new JsonObject();
+            }
+            reader.close();
+        } catch (Throwable ignored) {
+        }
+        return result;
+    }
+
+    private static JsonArray parseTxtToJsonArray(String str) {
+        JsonArray result = new JsonArray();
+        try {
+            BufferedReader reader = new BufferedReader(new StringReader(str.replace("\r\n", "\n").replace("\r", "")));
+            String line;
+            JsonObject currentGroup = null;
+            JsonObject pendingMeta = new JsonObject();
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty()) continue;
+                if (line.startsWith("#")) {
+                    if (isSetting(line)) mergeMeta(pendingMeta, buildSetting(line));
+                    continue;
+                }
+                if (line.contains("#genre#")) {
+                    String groupName = line.split(",", 2)[0].trim();
+                    currentGroup = findOrCreateGroup(result, groupName);
+                    pendingMeta = new JsonObject();
+                    continue;
+                }
+                String[] split = line.split(",", 2);
+                if (split.length < 2) continue;
+                if (currentGroup == null) currentGroup = findOrCreateGroup(result, "Ungrouped");
+                JsonObject channel = new JsonObject();
+                channel.addProperty("name", split[0].trim());
+                mergeMeta(channel, pendingMeta);
+                ArrayList<String> urls = new ArrayList<String>();
+                for (String part : split[1].trim().split("#")) {
+                    String url = part.trim();
+                    if (isUrl(url) && !urls.contains(url)) urls.add(url);
+                }
+                if (urls.isEmpty()) continue;
+                JsonArray urlArray = new JsonArray();
+                for (String url : urls) urlArray.add(url);
+                channel.add("urls", urlArray);
+                addChannel(currentGroup, channel);
+                pendingMeta = new JsonObject();
+            }
+            reader.close();
+        } catch (Throwable ignored) {
+        }
+        return result;
+    }
+
+    private static JsonObject parseHeaderString(String text) {
+        JsonObject wrapper = new JsonObject();
+        JsonObject obj = new JsonObject();
+        String[] params = text.split("&");
+        for (String param : params) {
+            if (!param.contains("=")) continue;
+            String[] a = param.split("=", 2);
+            obj.addProperty(a[0].trim().replace("\"", ""), a[1].trim().replace("\"", ""));
+        }
+        if (obj.entrySet().size() > 0) wrapper.add("header", obj);
+        return wrapper;
+    }
+
+    private static JsonObject findOrCreateGroup(JsonArray result, String name) {
+        for (JsonElement element : result) {
+            JsonObject group = element.getAsJsonObject();
+            if (name.equals(group.get("group").getAsString())) return group;
+        }
+        JsonObject group = new JsonObject();
+        group.addProperty("group", name);
+        group.add("channels", new JsonArray());
+        result.add(group);
+        return group;
+    }
+
+    private static void addChannel(JsonObject group, JsonObject channel) {
+        JsonArray channels = group.has("channels") ? group.getAsJsonArray("channels") : new JsonArray();
+        String name = DefaultConfig.safeJsonString(channel, "name", "");
+        JsonObject exists = name.isEmpty() ? null : findChannel(channels, name);
+        if (exists == null) {
+            channels.add(channel);
+        } else {
+            mergeChannel(exists, channel);
+        }
+        group.add("channels", channels);
+    }
+
+    private static JsonObject findChannel(JsonArray channels, String name) {
+        for (JsonElement element : channels) {
+            if (!element.isJsonObject()) continue;
+            JsonObject channel = element.getAsJsonObject();
+            if (name.equals(DefaultConfig.safeJsonString(channel, "name", ""))) return channel;
+        }
+        return null;
+    }
+
+    private static void mergeChannel(JsonObject dst, JsonObject src) {
+        mergeUrls(dst, src);
+        for (Map.Entry<String, JsonElement> entry : src.entrySet()) {
+            String key = entry.getKey();
+            if ("urls".equals(key)) continue;
+            if (!dst.has(key) || isEmptyValue(dst.get(key))) dst.add(key, entry.getValue());
+        }
+    }
+
+    private static void mergeUrls(JsonObject dst, JsonObject src) {
+        if (!src.has("urls") || !src.get("urls").isJsonArray()) return;
+        JsonArray dstUrls = dst.has("urls") && dst.get("urls").isJsonArray() ? dst.getAsJsonArray("urls") : new JsonArray();
+        for (JsonElement element : src.getAsJsonArray("urls")) {
+            if (!element.isJsonPrimitive()) continue;
+            String url = element.getAsString().trim();
+            if (isUrl(url) && !containsUrl(dstUrls, url)) dstUrls.add(url);
+        }
+        dst.add("urls", dstUrls);
+    }
+
+    private static boolean isEmptyValue(JsonElement element) {
+        if (element == null || element.isJsonNull()) return true;
+        if (element.isJsonPrimitive()) return element.getAsString().trim().isEmpty();
+        if (element.isJsonArray()) return element.getAsJsonArray().size() == 0;
+        return element.isJsonObject() && element.getAsJsonObject().entrySet().size() == 0;
+    }
+
+    private static boolean containsUrl(JsonArray urls, String url) {
+        for (JsonElement element : urls) {
+            if (url.equals(element.getAsString())) return true;
+        }
+        return false;
+    }
+
+    private static void mergeMeta(JsonObject dst, JsonObject src) {
+        for (Map.Entry<String, JsonElement> entry : src.entrySet()) {
+            dst.add(entry.getKey(), entry.getValue());
+        }
+    }
+
+    private static JsonObject buildMeta(String line) {
+        JsonObject obj = new JsonObject();
+        put(obj, "logo", get(line, TVG_LOGO_PATTERN));
+        put(obj, "epg", get(line, TVG_URL_PATTERN));
+        put(obj, "tvg-id", get(line, TVG_ID_PATTERN));
+        put(obj, "tvg-name", get(line, TVG_NAME_PATTERN));
+        put(obj, "tvg-chno", get(line, TVG_CHNO_PATTERN));
+        put(obj, "ua", get(line, HTTP_USER_AGENT_PATTERN));
+        String catchup = get(line, CATCHUP_PATTERN);
+        String source = get(line, CATCHUP_SOURCE_PATTERN);
+        String replace = get(line, CATCHUP_REPLACE_PATTERN);
+        if (!catchup.isEmpty() || !source.isEmpty() || !replace.isEmpty()) {
+            JsonObject catchupObj = new JsonObject();
+            put(catchupObj, "type", catchup);
+            put(catchupObj, "source", source);
+            put(catchupObj, "replace", replace);
+            obj.add("catchup", catchupObj);
+        }
+        return obj;
+    }
+
+    private static JsonObject buildSetting(String line) {
+        JsonObject obj = new JsonObject();
+        if (line.startsWith("ua")) put(obj, "ua", getValue(line, "ua"));
+        if (line.startsWith("parse")) put(obj, "parse", getValue(line, "parse"));
+        if (line.startsWith("click")) put(obj, "click", getValue(line, "click"));
+        if (line.startsWith("header")) {
+            String value = getValue(line, "header");
+            if (!value.isEmpty()) {
+                try {
+                    obj.add("header", JsonParser.parseString(value).getAsJsonObject());
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        if (line.startsWith("format")) put(obj, "format", getValue(line, "format"));
+        if (line.startsWith("origin")) put(obj, "origin", getValue(line, "origin"));
+        if (line.startsWith("referer")) put(obj, "referer", getValue(line, "referer"));
+        if (line.startsWith("#EXTHTTP:")) {
+            try {
+                obj.add("header", JsonParser.parseString(line.split("#EXTHTTP:")[1].trim()).getAsJsonObject());
+            } catch (Throwable ignored) {
+            }
+        }
+        if (line.startsWith("#EXTVLCOPT:")) {
+            if (line.contains("http-user-agent")) put(obj, "ua", getValue(line, "http-user-agent"));
+            if (line.contains("http-origin")) put(obj, "origin", getValue(line, "http-origin"));
+            if (line.contains("http-referrer")) put(obj, "referer", getValue(line, "http-referrer"));
+        }
+        if (line.startsWith("#KODIPROP:") && line.contains("manifest_type=")) {
+            put(obj, "format", getValue(line, "manifest_type"));
+        }
+        return obj;
     }
 
     private static boolean isSetting(String line) {
         return line.startsWith("ua") || line.startsWith("parse") || line.startsWith("click") || line.startsWith("player") || line.startsWith("header") || line.startsWith("format") || line.startsWith("origin") || line.startsWith("referer") || line.startsWith("#EXTHTTP:") || line.startsWith("#EXTVLCOPT:") || line.startsWith("#KODIPROP:");
     }
 
-    //解析txt后缀
-    public static void parseTxt(LinkedHashMap<String, LinkedHashMap<String, ArrayList<String>>> linkedHashMap, String str) {
-        ArrayList<String> arrayList;
-        try {
-            BufferedReader bufferedReader = new BufferedReader(new StringReader(str));
-            String readLine = bufferedReader.readLine();
-            LinkedHashMap<String, ArrayList<String>> linkedHashMap2 = new LinkedHashMap<>();
-            LinkedHashMap<String, ArrayList<String>> linkedHashMap3 = linkedHashMap2;
-            while (readLine != null) {
-                if (readLine.trim().isEmpty() || readLine.startsWith("#")) {
-                    readLine = bufferedReader.readLine();
-                } else {
-                    String[] split = readLine.split(",");
-                    if (split.length < 2) {
-                        readLine = bufferedReader.readLine();
-                    } else {
-                        if (readLine.contains("#genre#")) {
-                            String trim = split[0].trim();
-                            if (!linkedHashMap.containsKey(trim)) {
-                                linkedHashMap3 = new LinkedHashMap<>();
-                                linkedHashMap.put(trim, linkedHashMap3);
-                            } else {
-                                linkedHashMap3 = linkedHashMap.get(trim);
-                            }
-                        } else {
-                            String trim2 = split[0].trim();
-                            for (String str2 : split[1].trim().split("#")) {
-                                String trim3 = str2.trim();
-                                if (isUrl(trim3)) {
-                                    if (!linkedHashMap3.containsKey(trim2)) {
-                                        arrayList = new ArrayList<>();
-                                        linkedHashMap3.put(trim2, arrayList);
-                                    } else {
-                                        arrayList = linkedHashMap3.get(trim2);
-                                    }
-                                    if (!arrayList.contains(trim3)) {
-                                        arrayList.add(trim3);
-                                    }
-                                }
-                            }
-                        }
-                        readLine = bufferedReader.readLine();
-                    }
-                }
-            }
-            bufferedReader.close();
-            if (linkedHashMap2.isEmpty()) {
-                return;
-            }
-            linkedHashMap.put("未分组", linkedHashMap2);
-        } catch (Throwable unused) {
-        }
+    private static boolean isUrl(String url) {
+        return !url.isEmpty() && (url.startsWith("http") || url.startsWith("rtp") || url.startsWith("rtsp") || url.startsWith("rtmp"));
     }
 
-    public static JsonArray live2JsonArray(LinkedHashMap<String, LinkedHashMap<String, ArrayList<String>>> linkedHashMap) {
-        JsonArray jsonarr = new JsonArray();
-        for (String str : linkedHashMap.keySet()) {
-            JsonArray jsonarr2 = new JsonArray();
-            LinkedHashMap<String, ArrayList<String>> linkedHashMap2 = linkedHashMap.get(str);
-            if (!linkedHashMap2.isEmpty()) {
-                for (String str2 : linkedHashMap2.keySet()) {
-                    ArrayList<String> arrayList = linkedHashMap2.get(str2);
-                    if (!arrayList.isEmpty()) {
-                        JsonArray jsonarr3 = new JsonArray();
-                        for (int i = 0; i < arrayList.size(); i++) {
-                            jsonarr3.add(arrayList.get(i));
-                        }
-                        JsonObject jsonobj = new JsonObject();
-                        try {
-                            jsonobj.addProperty("name", str2);
-                            jsonobj.add("urls", jsonarr3);
-                        } catch (Throwable e) {
-                        }
-                        jsonarr2.add(jsonobj);
-                    }
-                }
-                JsonObject jsonobj2 = new JsonObject();
-                try {
-                    jsonobj2.addProperty("group", str);
-                    jsonobj2.add("channels", jsonarr2);
-                } catch (Throwable e) {
-                }
-                jsonarr.add(jsonobj2);
-            }
-        }
-        return jsonarr;
+    private static String get(String line, Pattern pattern) {
+        Matcher matcher = pattern.matcher(line);
+        if (matcher.find()) return matcher.group(1).trim();
+        return "";
+    }
+
+    private static String getValue(String line, String key) {
+        int index = line.indexOf(key + "=");
+        if (index == -1) return "";
+        return line.substring(index + key.length() + 1).trim().replace("\"", "");
+    }
+
+    private static void put(JsonObject obj, String key, String value) {
+        if (value != null && !value.isEmpty()) obj.addProperty(key, value);
     }
 }

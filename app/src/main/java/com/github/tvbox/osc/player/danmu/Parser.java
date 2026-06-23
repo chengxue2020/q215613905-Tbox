@@ -7,7 +7,7 @@ import com.github.tvbox.osc.bean.Danmu;
 import com.github.tvbox.osc.util.DanmuHelper;
 import com.github.tvbox.osc.util.FileUtils;
 import com.github.tvbox.osc.util.LOG;
-import com.lzy.okgo.OkGo;
+import com.github.tvbox.osc.util.SSL.SSLSocketFactoryCompat;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -16,10 +16,18 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
+import java.net.SocketTimeoutException;
+import java.security.cert.CertificateException;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
+
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.X509TrustManager;
 
 import master.flame.danmaku.danmaku.model.AlphaValue;
 import master.flame.danmaku.danmaku.model.BaseDanmaku;
@@ -31,14 +39,49 @@ import master.flame.danmaku.danmaku.model.android.DanmakuFactory;
 import master.flame.danmaku.danmaku.model.android.Danmakus;
 import master.flame.danmaku.danmaku.parser.BaseDanmakuParser;
 import master.flame.danmaku.danmaku.util.DanmakuUtils;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
 
 public class Parser extends BaseDanmakuParser {
+    public interface CancelChecker {
+        boolean isCancelled();
+    }
+
+    private static final long HTTP_TIMEOUT_MS = 20 * 1000L;
+    private static final X509TrustManager TRUST_ALL_CERT = new X509TrustManager() {
+        @Override
+        public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) throws CertificateException {
+        }
+
+        @Override
+        public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) throws CertificateException {
+        }
+
+        @Override
+        public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+            return new java.security.cert.X509Certificate[]{};
+        }
+    };
+    private static final HostnameVerifier TRUST_ALL_HOSTNAME = new HostnameVerifier() {
+        @Override
+        public boolean verify(String hostname, SSLSession session) {
+            return true;
+        }
+    };
+    private static final OkHttpClient HTTP_CLIENT = buildHttpClient(false);
+    private static final OkHttpClient UNSAFE_HTTP_CLIENT = buildHttpClient(true);
     private final Danmu danmu;
+    private final CancelChecker cancelChecker;
     private float scaleX;
     private float scaleY;
     private int index;
 
     public Parser(String input) {
+        this(input, null);
+    }
+
+    public Parser(String input, CancelChecker cancelChecker) {
+        this.cancelChecker = cancelChecker;
         this.danmu = Danmu.fromXml(resolveContent(input));
     }
 
@@ -47,18 +90,63 @@ public class Parser extends BaseDanmakuParser {
     }
 
     private String resolveContent(String input) {
+        if (isCancelled()) return "";
         if (TextUtils.isEmpty(input)) return "";
         String source = input.trim();
         if (source.startsWith("file")) return FileUtils.read(source);
         if (source.startsWith("http")) {
             try {
-                okhttp3.Response response = OkGo.<String>get(source).execute();
+                if (isCancelled()) return "";
+                okhttp3.Response response = executeHttp(source);
+                if (isCancelled()) {
+                    response.close();
+                    return "";
+                }
                 String content = readBody(response);
                 LOG.i("echo-danmu http code: " + response.code()
                         + ", encoding: " + response.header("Content-Encoding", "")
                         + ", length: " + content.length());
                 return content;
+            } catch (SocketTimeoutException e) {
+                if (isLocalProxy(source)) {
+                    try {
+                        LOG.e("echo-danmu load timeout, retry local proxy");
+                        if (isCancelled()) return "";
+                        okhttp3.Response response = executeHttp(source);
+                        if (isCancelled()) {
+                            response.close();
+                            return "";
+                        }
+                        String content = readBody(response);
+                        LOG.i("echo-danmu retry http code: " + response.code()
+                                + ", encoding: " + response.header("Content-Encoding", "")
+                                + ", length: " + content.length());
+                        return content;
+                    } catch (Throwable retryError) {
+                        LOG.e("echo-danmu retry error: " + retryError.getMessage());
+                    }
+                }
+                LOG.e("echo-danmu load error: timeout");
+                return "";
             } catch (Throwable th) {
+                if (source.startsWith("https") && isSslError(th)) {
+                    try {
+                        LOG.i("echo-danmu ssl verify failed, retry unsafe ssl");
+                        if (isCancelled()) return "";
+                        okhttp3.Response response = executeUnsafeHttp(source);
+                        if (isCancelled()) {
+                            response.close();
+                            return "";
+                        }
+                        String content = readBody(response);
+                        LOG.i("echo-danmu unsafe ssl http code: " + response.code()
+                                + ", encoding: " + response.header("Content-Encoding", "")
+                                + ", length: " + content.length());
+                        return content;
+                    } catch (Throwable retryError) {
+                        LOG.e("echo-danmu unsafe ssl retry error: " + retryError.getMessage());
+                    }
+                }
                 LOG.e("echo-danmu load error: " + th.getMessage());
                 return "";
             }
@@ -66,17 +154,58 @@ public class Parser extends BaseDanmakuParser {
         return source;
     }
 
+    private boolean isCancelled() {
+        return cancelChecker != null && cancelChecker.isCancelled();
+    }
+
+    private static OkHttpClient buildHttpClient(boolean unsafeSsl) {
+        OkHttpClient.Builder builder = new OkHttpClient.Builder()
+                .readTimeout(HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .writeTimeout(HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .connectTimeout(HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .retryOnConnectionFailure(true);
+        if (unsafeSsl) {
+            SSLSocketFactory sslSocketFactory = new SSLSocketFactoryCompat(TRUST_ALL_CERT);
+            builder.sslSocketFactory(sslSocketFactory, TRUST_ALL_CERT);
+            builder.hostnameVerifier(TRUST_ALL_HOSTNAME);
+        }
+        return builder.build();
+    }
+
+    private okhttp3.Response executeHttp(String source) throws IOException {
+        Request request = new Request.Builder().url(source).get().build();
+        return HTTP_CLIENT.newCall(request).execute();
+    }
+
+    private okhttp3.Response executeUnsafeHttp(String source) throws IOException {
+        Request request = new Request.Builder().url(source).get().build();
+        return UNSAFE_HTTP_CLIENT.newCall(request).execute();
+    }
+
+    private boolean isSslError(Throwable th) {
+        while (th != null) {
+            if (th instanceof SSLException) return true;
+            th = th.getCause();
+        }
+        return false;
+    }
+
+    private boolean isLocalProxy(String source) {
+        return source.startsWith("http://127.0.0.1:")
+                || source.startsWith("http://localhost:");
+    }
+
     private String readBody(okhttp3.Response response) throws IOException {
         if (response.body() == null) return "";
         byte[] bytes = response.body().bytes();
-        if (looksXml(bytes)) return new String(bytes, StandardCharsets.UTF_8);
+        if (looksXml(bytes)) return new String(bytes, "UTF-8");
         String encoding = response.header("Content-Encoding", "");
         if ("gzip".equalsIgnoreCase(encoding)) {
             bytes = readAll(new GZIPInputStream(new ByteArrayInputStream(bytes)));
         } else if ("deflate".equalsIgnoreCase(encoding)) {
             bytes = inflate(bytes);
         }
-        return new String(bytes, StandardCharsets.UTF_8);
+        return new String(bytes, "UTF-8");
     }
 
     private boolean looksXml(byte[] bytes) {
@@ -119,13 +248,16 @@ public class Parser extends BaseDanmakuParser {
     @Override
     protected Danmakus parse() {
         Danmakus result = new Danmakus(IDanmakus.ST_BY_TIME);
+        int renderedCount = 0;
         for (Danmu.Data data : danmu.getData()) {
             BaseDanmaku danmaku = createDanmaku(data);
             if (danmaku == null) continue;
             synchronized (result.obtainSynchronizer()) {
                 result.addItem(danmaku);
             }
+            renderedCount++;
         }
+        LOG.i("echo-danmu rendered count: " + renderedCount);
         return result;
     }
 

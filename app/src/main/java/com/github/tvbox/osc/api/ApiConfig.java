@@ -77,6 +77,7 @@ public class ApiConfig {
     private String spider = null;
     private String currentPyKey = "";
     private String currentLivePyKey = "";
+    private String currentPlaySourceKey = "";
     public String wallpaper = "";
     private String danmaku = "";
 
@@ -269,8 +270,8 @@ public class ApiConfig {
         }
         String configUrl=configUrl(apiUrl);
         // 使用内部存储，将当前配置地址写入到应用的私有目录中
-        File configUrlFile = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/config_url");
-        FileUtils.saveCache(configUrlFile,configUrl);
+//        File configUrlFile = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/config_url");
+//        FileUtils.saveCache(configUrlFile,configUrl);
 
         OkGo.<String>get(configUrl)
                 .headers("User-Agent", userAgent)
@@ -280,7 +281,7 @@ public class ApiConfig {
                     public void onSuccess(Response<String> response) {
                         try {
                             String json = response.body();
-                            LOG.i("echo-ConfigJson"+json);
+//                            LOG.i("echo-ConfigJson"+json);
                             if (switchApiCollectionIfNeeded(apiUrl, json)) {
                                 FileUtils.saveCache(cache,json);
                                 loadConfig(false, callback, activity);
@@ -335,7 +336,13 @@ public class ApiConfig {
                 });
     }
 
+    private static final int LOAD_JAR_MAX_RETRY = 1;
+
     public void loadJar(boolean useCache, String spider, LoadConfigCallback callback) {
+        loadJar(useCache, spider, callback, 0);
+    }
+
+    private void loadJar(boolean useCache, String spider, LoadConfigCallback callback, int retryCount) {
         String[] urls = spider.split(";md5;");
         String jarUrl = urls[0];
         String md5 = urls.length > 1 ? urls[1].trim() : "";
@@ -363,10 +370,21 @@ public class ApiConfig {
         boolean isJarInImg = jarUrl.startsWith("img+");
         jarUrl = jarUrl.replace("img+", "");
         LOG.i("echo-load jar start:"+jarUrl);
+        final String requestUrl = jarUrl;
         OkGo.<File>get(jarUrl)
                 .headers("User-Agent", userAgent)
                 .headers("Accept", requestAccept)
                 .execute(new AbsCallback<File>() {
+
+                    private boolean retryLoad(String reason) {
+                        if (retryCount >= LOAD_JAR_MAX_RETRY) return false;
+                        if (cache.exists() && !cache.delete()) {
+                            LOG.i("echo---delete bad jar cache failed:" + cache.getAbsolutePath());
+                        }
+                        LOG.i("echo---retry load jar reason:" + reason + " url:" + requestUrl + " retry:" + (retryCount + 1));
+                        loadJar(false, spider, callback, retryCount + 1);
+                        return true;
+                    }
 
                     @Override
                     public File convertResponse(okhttp3.Response response){
@@ -383,7 +401,9 @@ public class ApiConfig {
                                 byte[] imgJar = getImgJar(respData);
                                 if (imgJar == null || imgJar.length == 0) {
                                     LOG.e("echo---Generated JAR data is empty");
-                                    callback.error("JAR 是空的");
+                                    if (retryLoad("empty_img_jar")) return null;
+                                    callback.error("JAR is empty");
+                                    return null;
                                 }
                                 fos.write(imgJar);
                             } else {
@@ -412,15 +432,18 @@ public class ApiConfig {
                                     callback.success();
                                 } else {
                                     LOG.e("echo---jar Loader returned false");
+                                    if (retryLoad("loader_false")) return;
                                     callback.error("JAR加载失败");
                                 }
                             } catch (Exception e) {
                                 LOG.e("echo---jar Loader threw exception: " + e.getMessage());
+                                if (retryLoad("loader_exception")) return;
                                 callback.error("JAR加载异常: ");
                             }
                         } else {
                             LOG.e("echo---jar File not found");
-                            callback.error("JAR文件不存在");
+                            if (retryLoad("file_missing")) return;
+                            callback.error("JAR file not found");
                         }
                     }
 
@@ -430,6 +453,11 @@ public class ApiConfig {
                         if (ex != null) {
                             LOG.i("echo---jar Request failed: " + ex.getMessage());
                         }
+                        if (cache.exists() && jarLoader.load(cache.getAbsolutePath())) {
+                            callback.success();
+                            return;
+                        }
+                        if (retryLoad("request_error")) return;
                         if(cache.exists())jarLoader.load(cache.getAbsolutePath());
                         callback.error("网络错误");
                     }
@@ -566,8 +594,7 @@ public class ApiConfig {
             sb.setCategories(DefaultConfig.safeJsonStringList(obj, "categories"));
             sb.setClickSelector(DefaultConfig.safeJsonString(obj, "click", ""));
             sb.setStyle(DefaultConfig.safeJsonString(obj, "style", ""));
-            if (firstSite == null && sb.getFilterable()==1)
-                firstSite = sb;
+            if (firstSite == null) firstSite = sb;
             sourceBeanList.put(siteKey, sb);
         }
         if (sourceBeanList != null && sourceBeanList.size() > 0) {
@@ -903,8 +930,40 @@ public class ApiConfig {
                 JsonObject obj = (JsonObject) channelElement;
                 LiveChannelItem liveChannelItem = new LiveChannelItem();
                 liveChannelItem.setChannelName(obj.get("name").getAsString().trim());
-                liveChannelItem.setChannelIndex(channelIndex++);
-                liveChannelItem.setChannelNum(++channelNum);
+                liveChannelItem.setChannelLogo(DefaultConfig.safeJsonString(obj, "logo", ""));
+                liveChannelItem.setChannelEpg(DefaultConfig.safeJsonString(obj, "epg", ""));
+                liveChannelItem.setChannelUa(DefaultConfig.safeJsonString(obj, "ua", ""));
+                liveChannelItem.setChannelClick(DefaultConfig.safeJsonString(obj, "click", ""));
+                liveChannelItem.setChannelFormat(DefaultConfig.safeJsonString(obj, "format", ""));
+                liveChannelItem.setChannelOrigin(DefaultConfig.safeJsonString(obj, "origin", ""));
+                liveChannelItem.setChannelReferer(DefaultConfig.safeJsonString(obj, "referer", ""));
+                liveChannelItem.setChannelTvgId(DefaultConfig.safeJsonString(obj, "tvg-id", ""));
+                liveChannelItem.setChannelTvgName(DefaultConfig.safeJsonString(obj, "tvg-name", ""));
+                if (obj.has("parse")) {
+                    try {
+                        liveChannelItem.setChannelParse(obj.get("parse").getAsInt());
+                    } catch (Throwable ignored) {
+                    }
+                }
+                if (obj.has("catchup")) {
+                    JsonObject catchupObj = new JsonObject();
+                    if (obj.get("catchup").isJsonObject()) {
+                        catchupObj = obj.getAsJsonObject("catchup");
+                    } else {
+                        catchupObj.addProperty("type", obj.get("catchup").getAsString());
+                        if (obj.has("catchup-source")) catchupObj.addProperty("source", obj.get("catchup-source").getAsString());
+                        if (obj.has("catchup-replace")) catchupObj.addProperty("replace", obj.get("catchup-replace").getAsString());
+                    }
+                    liveChannelItem.setChannelCatchup(catchupObj);
+                }
+                if (obj.has("header") && obj.get("header").isJsonObject()) {
+                    JsonObject headerObj = obj.getAsJsonObject("header");
+                    HashMap<String, String> channelHeader = new HashMap<>();
+                    for (Map.Entry<String, JsonElement> entry : headerObj.entrySet()) {
+                        channelHeader.put(entry.getKey(), entry.getValue().getAsString());
+                    }
+                    liveChannelItem.setChannelHeader(channelHeader);
+                }
                 ArrayList<String> urls = DefaultConfig.safeJsonStringList(obj, "urls");
                 ArrayList<String> sourceNames = new ArrayList<>();
                 ArrayList<String> sourceUrls = new ArrayList<>();
@@ -920,10 +979,61 @@ public class ApiConfig {
                 }
                 liveChannelItem.setChannelSourceNames(sourceNames);
                 liveChannelItem.setChannelUrls(sourceUrls);
-                liveChannelGroup.getLiveChannels().add(liveChannelItem);
+                if (mergeLiveChannel(liveChannelGroup.getLiveChannels(), liveChannelItem)) {
+                    liveChannelItem.setChannelIndex(channelIndex++);
+                    liveChannelItem.setChannelNum(++channelNum);
+                }
             }
             liveChannelGroupList.add(liveChannelGroup);
         }
+    }
+
+    private boolean mergeLiveChannel(ArrayList<LiveChannelItem> channelItems, LiveChannelItem newItem) {
+        LiveChannelItem oldItem = findLiveChannel(channelItems, newItem.getChannelName());
+        if (oldItem == null) {
+            channelItems.add(newItem);
+            return true;
+        }
+        mergeLiveChannelUrls(oldItem, newItem);
+        return false;
+    }
+
+    private LiveChannelItem findLiveChannel(ArrayList<LiveChannelItem> channelItems, String channelName) {
+        for (LiveChannelItem item : channelItems) {
+            if (channelName != null && channelName.equals(item.getChannelName())) return item;
+        }
+        return null;
+    }
+
+    private void mergeLiveChannelUrls(LiveChannelItem oldItem, LiveChannelItem newItem) {
+        ArrayList<String> oldUrls = oldItem.getChannelUrls();
+        ArrayList<String> oldSourceNames = oldItem.getChannelSourceNames();
+        if (oldUrls == null) {
+            oldUrls = new ArrayList<>();
+            oldItem.setChannelUrls(oldUrls);
+        }
+        if (oldSourceNames == null) {
+            oldSourceNames = new ArrayList<>();
+            oldItem.setChannelSourceNames(oldSourceNames);
+        }
+        while (oldSourceNames.size() < oldUrls.size()) {
+            oldSourceNames.add("源" + Integer.toString(oldSourceNames.size() + 1));
+        }
+        ArrayList<String> newUrls = newItem.getChannelUrls();
+        ArrayList<String> newSourceNames = newItem.getChannelSourceNames();
+        if (newUrls == null) return;
+        for (int i = 0; i < newUrls.size(); i++) {
+            String url = newUrls.get(i);
+            if (oldUrls.contains(url)) continue;
+            oldUrls.add(url);
+            if (newSourceNames != null && i < newSourceNames.size()) {
+                oldSourceNames.add(newSourceNames.get(i));
+            } else {
+                oldSourceNames.add("源" + Integer.toString(oldSourceNames.size() + 1));
+            }
+        }
+        oldItem.setChannelUrls(oldUrls);
+        oldItem.setChannelSourceNames(oldSourceNames);
     }
 
     public void loadLiveApi(JsonObject livesOBJ) {
@@ -1092,20 +1202,34 @@ public class ApiConfig {
         if ("py".equals(param.get("do"))) {
             return pyLoader.proxyInvoke(param, getCurrentPyKey());
         }
-        SourceBean sourceBean = ApiConfig.get().getHomeSourceBean();
+        SourceBean sourceBean = getCurrentProxySource(param);
         String apiString = sourceBean.getApi();
         return apiString.contains(".py") ? pyLoader.proxyInvoke(param, getCurrentPyKey()) : jarLoader.proxyInvoke(param);
     }
 
-    private String getCurrentPyKey() {
-        if (!TextUtils.isEmpty(currentPyKey)) {
-            return currentPyKey;
+    private SourceBean getCurrentProxySource(Map<String, String> param) {
+        String siteKey = param.get("siteKey");
+        if (TextUtils.isEmpty(siteKey)) {
+            siteKey = currentPlaySourceKey;
+            if (!TextUtils.isEmpty(siteKey)) param.put("siteKey", siteKey);
         }
-        SourceBean sourceBean = ApiConfig.get().getHomeSourceBean();
+        SourceBean sourceBean = TextUtils.isEmpty(siteKey) ? null : getSource(siteKey);
+        return sourceBean == null ? ApiConfig.get().getHomeSourceBean() : sourceBean;
+    }
+
+    public void setCurrentPlaySourceKey(String sourceKey) {
+        currentPlaySourceKey = sourceKey == null ? "" : sourceKey;
+    }
+
+    private String getCurrentPyKey() {
+        SourceBean sourceBean = getCurrentProxySource(new HashMap<String, String>());
         if (sourceBean.getApi().contains(".py")) {
-            currentPyKey = sourceBean.getKey();
-            pyLoader.getSpider(currentPyKey, sourceBean.getApi(), sourceBean.getExt());
-            pyLoader.setRecentPyKey(currentPyKey);
+            if (!sourceBean.getKey().equals(currentPyKey)) {
+                currentPyKey = sourceBean.getKey();
+                pyLoader.getSpider(currentPyKey, sourceBean.getApi(), sourceBean.getExt());
+                pyLoader.setRecentPyKey(currentPyKey);
+            }
+            return currentPyKey;
         }
         return currentPyKey;
     }

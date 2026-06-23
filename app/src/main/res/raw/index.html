@@ -71,8 +71,26 @@
 										<div class="weui-cell__bd weui-flex">
 											<input id="diy_api_url"
 												class="weui-input weui-cell__control weui-cell__control_flex"
-												type="text" value="" placeholder="请输入自定义配置接口地址..." />
+												type="text" value="" placeholder="请输入点播配置接口地址..." />
 											<button onclick="api(); return false;"
+												class="weui-cell__control weui-btn weui-btn_default weui-vcode-btn">确定</button>
+										</div>
+									</div>
+									<div class="weui-cell weui-cell_active weui-cell_vcode weui-cell_wrap">
+										<div class="weui-cell__bd weui-flex">
+											<input id="diy_live_api_url"
+												class="weui-input weui-cell__control weui-cell__control_flex"
+												type="text" value="" placeholder="请输入直播配置接口地址..." />
+											<button onclick="liveApi(); return false;"
+												class="weui-cell__control weui-btn weui-btn_default weui-vcode-btn">确定</button>
+										</div>
+									</div>
+									<div class="weui-cell weui-cell_active weui-cell_vcode weui-cell_wrap">
+										<div class="weui-cell__bd weui-flex">
+											<input id="diy_danmu_api_url"
+												class="weui-input weui-cell__control weui-cell__control_flex"
+												type="text" value="" placeholder="请输入弹幕搜索接口地址..." />
+											<button onclick="danmuApi(); return false;"
 												class="weui-cell__control weui-btn weui-btn_default weui-vcode-btn">确定</button>
 										</div>
 									</div>
@@ -155,8 +173,10 @@
 							</div> -->
 							<div class="weui-cell weui-cell_active weui-cell_vcode weui-cell_wrap">
 								<div class="weui-cell__hd"><label class="weui-label">本机地址</label></div>
-								<div class="weui-cell__bd weui-flex"><button onclick="fileToApi(1); return false;"
-										class="weui-cell__control weui-btn weui-btn_default weui-vcode-btn">使用</button>
+								<div class="weui-cell__bd weui-flex"><button onclick="fileToApi(1, false); return false;"
+										class="weui-cell__control weui-btn weui-btn_default weui-vcode-btn">点播</button>
+									<button onclick="fileToApi(1, true); return false;"
+										class="weui-cell__control weui-btn weui-btn_default weui-vcode-btn">直播</button>
 								</div>
 							</div>
 							<div class="weui-cell weui-cell_active weui-cell_vcode weui-cell_wrap">
@@ -168,8 +188,10 @@
 							</div>
 							<div class="weui-cell weui-cell_active weui-cell_vcode weui-cell_wrap">
 								<div class="weui-cell__hd"><label class="weui-label">局域网地址</label></div>
-								<div class="weui-cell__bd weui-flex"><button onclick="fileToApi(2); return false;"
-										class="weui-cell__control weui-btn weui-btn_default weui-vcode-btn">使用</button>
+								<div class="weui-cell__bd weui-flex"><button onclick="fileToApi(2, false); return false;"
+										class="weui-cell__control weui-btn weui-btn_default weui-vcode-btn">点播</button>
+									<button onclick="fileToApi(2, true); return false;"
+										class="weui-cell__control weui-btn weui-btn_default weui-vcode-btn">直播</button>
 								</div>
 							</div>
 							<div class="weui-cell weui-cell_active weui-cell_vcode weui-cell_wrap">
