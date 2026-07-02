@@ -45,7 +45,8 @@ public class Global {
     @Keep
     @Function
     public String js2Proxy(Boolean dynamic, Integer siteType, String siteKey, String url, JSObject headers) {
-        return getProxy(true) + "&from=catvod" + "&siteType=" + siteType + "&siteKey=" + siteKey + "&header=" + URLEncoder.encode(headers.toJsonString()) + "&url=" + URLEncoder.encode(url);
+        boolean local = dynamic == null || !dynamic;
+        return getProxy(local) + "&from=catvod" + "&siteType=" + siteType + "&siteKey=" + siteKey + "&header=" + URLEncoder.encode(headers.toJsonString()) + "&url=" + URLEncoder.encode(url);
     }
 
     @Keep

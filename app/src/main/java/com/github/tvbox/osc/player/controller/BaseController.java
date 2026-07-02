@@ -118,6 +118,7 @@ public abstract class BaseController extends BaseVideoController implements Gest
         super.onPlayStateChanged(playState);
         switch (playState) {
             case VideoView.STATE_IDLE:
+                mPauseRoot.setVisibility(GONE);
                 mLoading.setVisibility(GONE);
                 break;
             case VideoView.STATE_PLAYING:
@@ -131,10 +132,12 @@ public abstract class BaseController extends BaseVideoController implements Gest
             case VideoView.STATE_PREPARED:
             case VideoView.STATE_ERROR:
             case VideoView.STATE_BUFFERED:
+                mPauseRoot.setVisibility(GONE);
                 mLoading.setVisibility(GONE);
                 break;
             case VideoView.STATE_PREPARING:
             case VideoView.STATE_BUFFERING:
+                mPauseRoot.setVisibility(GONE);
                 mLoading.setVisibility(VISIBLE);
                 break;
             case VideoView.STATE_PLAYBACK_COMPLETED:
@@ -170,6 +173,12 @@ public abstract class BaseController extends BaseVideoController implements Gest
      */
     public void setDoubleTapTogglePlayEnabled(boolean enabled) {
         mIsDoubleTapTogglePlayEnabled = enabled;
+    }
+
+    public void hidePauseRoot() {
+        if (mPauseRoot != null) {
+            mPauseRoot.setVisibility(GONE);
+        }
     }
 
     @Override

@@ -12,6 +12,8 @@ import java.util.List;
  */
 @XStreamAlias("rss")
 public class AbsSortXml implements Serializable {
+    public String sourceKey;
+
     @XStreamAlias("class")
     public MovieSort classes;
 

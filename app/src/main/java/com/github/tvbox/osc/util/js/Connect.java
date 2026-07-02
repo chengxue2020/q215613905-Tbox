@@ -4,7 +4,6 @@ import android.util.Base64;
 
 import com.github.tvbox.osc.util.LOG;
 import com.github.tvbox.osc.util.OkGoHelper;
-import com.github.tvbox.osc.util.urlhttp.OkHttpUtil;
 import com.google.common.net.HttpHeaders;
 import com.lzy.okgo.OkGo;
 import com.whl.quickjs.wrapper.JSArray;
@@ -119,8 +118,23 @@ public class Connect {
                 }
             }
             OkGo.getInstance().cancelTag(tag);
-            OkHttpUtil.cancel(tag);
+            cancelDefaultClient(tag);
         } catch (Exception e) {
+        }
+    }
+
+    private static void cancelDefaultClient(Object tag) {
+        OkHttpClient defaultClient = OkGoHelper.getDefaultClient();
+        if (defaultClient == null || tag == null) return;
+        for (Call call : defaultClient.dispatcher().queuedCalls()) {
+            if (tag.equals(call.request().tag())) {
+                call.cancel();
+            }
+        }
+        for (Call call : defaultClient.dispatcher().runningCalls()) {
+            if (tag.equals(call.request().tag())) {
+                call.cancel();
+            }
         }
     }
 }

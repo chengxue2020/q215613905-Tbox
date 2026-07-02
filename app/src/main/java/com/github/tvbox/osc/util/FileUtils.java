@@ -4,9 +4,9 @@ import android.os.Environment;
 import android.text.TextUtils;
 import android.util.Base64;
 
+import com.github.catvod.net.OkHttp;
 import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.server.ControlManager;
-import com.github.tvbox.osc.util.urlhttp.OkHttpUtil;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.orhanobut.hawk.Hawk;
@@ -188,6 +188,25 @@ public class FileUtils {
             if (thunderCacheDir.exists()) cleanDirectory(thunderCacheDir);
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    public static void clearSpiderCacheFiles() {
+        cleanDirectory(new File(getFilePath() + "/csp/"));
+        cleanDirectory(new File(getCachePath() + "/jar/"));
+        cleanDirectory(new File(getCachePath() + "/py/"));
+        cleanDirectory(new File(getCachePath() + "/catvod_jsapi/"));
+        clearJsModuleCache();
+    }
+
+    private static void clearJsModuleCache() {
+        File externalCacheDir = new File(getExternalCachePath());
+        File[] files = externalCacheDir.listFiles();
+        if (files == null) return;
+        for (File file : files) {
+            if (file != null && file.getName().startsWith("qjscache_")) {
+                deleteFile(file);
+            }
         }
     }
 
@@ -392,7 +411,7 @@ public class FileUtils {
             headerMap=new HashMap<>();
             headerMap.put("User-Agent",str.startsWith("https://gitcode.net/") ? UA.random() : "okhttp/3.15");
         }
-        return OkHttpUtil.string(str,headerMap);
+        return OkHttp.string(str, headerMap);
     }
 
     public static File open(String str) {

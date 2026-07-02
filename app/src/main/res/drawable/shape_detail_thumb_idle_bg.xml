@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <corners android:radius="@dimen/preview_player_radius" />
+    <solid android:color="@color/color_000000_30" />
+    <stroke
+        android:width="1px"
+        android:color="@color/color_33FFFFFF" />
+</shape>

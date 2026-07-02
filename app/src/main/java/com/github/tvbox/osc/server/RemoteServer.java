@@ -84,10 +84,12 @@ public class RemoteServer extends NanoHTTPD {
         getRequestList.add(new RawRequestProcess(this.mContext, "/jquery.js", R.raw.jquery, "application/x-javascript"));
         getRequestList.add(new RawRequestProcess(this.mContext, "/script.js", R.raw.script, "application/x-javascript"));
         getRequestList.add(new RawRequestProcess(this.mContext, "/favicon.ico", R.drawable.app_icon, "image/x-icon"));
+        getRequestList.add(new CacheRequestProcess());
     }
 
     private void addPostRequestProcess() {
         postRequestList.add(new InputRequestProcess(this));
+        postRequestList.add(new CacheRequestProcess());
     }
 
     @Override
@@ -105,6 +107,10 @@ public class RemoteServer extends NanoHTTPD {
 
     private Response getProxy(Object[] rs){
         try {
+            if (rs == null || rs.length < 3) {
+                LOG.e("echo-proxy error: empty proxy result");
+                return NanoHTTPD.newFixedLengthResponse(Response.Status.INTERNAL_ERROR, NanoHTTPD.MIME_PLAINTEXT, "500");
+            }
             if (rs[0] instanceof NanoHTTPD.Response) return (NanoHTTPD.Response) rs[0];
             int code = (int) rs[0];
             String mime = (String) rs[1];

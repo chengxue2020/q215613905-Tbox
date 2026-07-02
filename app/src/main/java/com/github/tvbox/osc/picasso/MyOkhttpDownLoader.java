@@ -20,13 +20,11 @@ import android.text.TextUtils;
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 
-import com.github.tvbox.osc.util.UA;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.squareup.picasso.Downloader;
 
 import java.io.IOException;
-import java.net.URL;
 import java.net.URLDecoder;
 
 import okhttp3.Cache;
@@ -39,6 +37,7 @@ import okhttp3.Response;
  * A {@link Downloader} which uses OkHttp to download images.
  */
 public final class MyOkhttpDownLoader implements Downloader {
+    private static final String DEFAULT_USER_AGENT = "Dalvik/2.1.0 (Linux; U; Android 13; M2102J2SC Build/TKQ1.220829.002)";
     @VisibleForTesting
     final Call.Factory client;
     private final Cache cache;
@@ -85,31 +84,25 @@ public final class MyOkhttpDownLoader implements Downloader {
             JsonObject jsonInfo = new Gson().fromJson(header, JsonObject.class);
             for (String key : jsonInfo.keySet()) {
                 String val = jsonInfo.get(key).getAsString();
-                mRequestBuilder.addHeader(key.toUpperCase(), removeDuplicateSlashes(val));
+                if (!TextUtils.isEmpty(key) && !TextUtils.isEmpty(val)) {
+                    mRequestBuilder.header(key, val.trim());
+                }
             }
-        }else {
-            if(!TextUtils.isEmpty(cookie)) {
-                assert cookie != null;
-                mRequestBuilder.addHeader("Cookie", cookie);
-            }
-            if(!TextUtils.isEmpty(ua)){
-                assert ua != null;
-                mRequestBuilder.addHeader("User-Agent", ua);
-            }else {
-                String mobile_UA = "Dalvik/2.1.0 (Linux; U; Android 13; M2102J2SC Build/TKQ1.220829.002)";
-                mRequestBuilder.addHeader("User-Agent", mobile_UA);
-            }
-            if(!TextUtils.isEmpty(referer)){
-                assert referer != null;
-                mRequestBuilder.addHeader("Referer", referer);
-            }
+        }
+        if(!TextUtils.isEmpty(cookie)) {
+            mRequestBuilder.header("Cookie", cookie);
+        }
+        if(!TextUtils.isEmpty(ua)){
+            mRequestBuilder.header("User-Agent", ua);
+        } else if (TextUtils.isEmpty(mRequestBuilder.build().header("User-Agent"))) {
+            mRequestBuilder.header("User-Agent", DEFAULT_USER_AGENT);
+        }
+        if(!TextUtils.isEmpty(referer)){
+            mRequestBuilder.header("Referer", referer);
         }
         return client.newCall(mRequestBuilder.build()).execute();
     }
 
-    private static String removeDuplicateSlashes(String paramValue) {
-        return paramValue.replaceAll("//", "/");
-    }
     @Override
     public void shutdown() {
         if (!sharedClient && cache != null) {

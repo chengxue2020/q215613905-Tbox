@@ -69,6 +69,20 @@ def loadFromDisk(fileName):
 def str2json(content):
     return json.loads(content)
 
+def getDependenceList(ru):
+    get_dependence = getattr(ru, 'getDependence', None)
+    if callable(get_dependence):
+        result = get_dependence()
+        return result if result is not None else []
+    return []
+
+def setExtendInfo(ru, extend):
+    setter = getattr(ru, 'setExtendInfo', None)
+    if callable(setter):
+        setter(extend)
+    else:
+        setattr(ru, 'extend', extend)
+
 gParam = {
     "SpiderList":{},
     "SpiderPath":{},
@@ -76,8 +90,7 @@ gParam = {
 }
 
 def getDependence(ru):
-    result = ru.getDependence()
-    return result
+    return getDependenceList(ru)
 
 def getName(ru):
     result = ru.getName()
@@ -88,16 +101,16 @@ def init(ru,extend):
     spList = gParam['SpiderList']
     sPath = gParam['SpiderPath']
     sParam = gParam['SpiderParam']
-    for key in ru.getDependence():
+    for key in getDependenceList(ru):
         sp = None
         if key in spList.keys():
             sp = spList[key]
         elif key in sPath.keys():
             sp = loadFromDisk(sPath[key])
         if sp != None:
-            sp.setExtendInfo(sParam[key])
+            setExtendInfo(sp, sParam[key])
             spoList.append(sp)
-    ru.setExtendInfo(extend)
+    setExtendInfo(ru, extend)
     ru.init(spoList if len(spoList) > 0 else extend)
 
 def homeContent(ru,filter):

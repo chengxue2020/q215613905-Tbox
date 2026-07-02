@@ -28,8 +28,19 @@ public class DefaultConfig {
 
     public static List<MovieSort.SortData> adjustSort(String sourceKey, List<MovieSort.SortData> list, boolean withMy) {
         List<MovieSort.SortData> data = new ArrayList<>();
-        if (sourceKey != null) {
+        if (sourceKey != null && list != null) {
             SourceBean sb = ApiConfig.get().getSource(sourceKey);
+            if (sb == null || sb.getCategories() == null) {
+                for (MovieSort.SortData sortData : list) {
+                    if (sortData.filters == null)
+                        sortData.filters = new ArrayList<>();
+                    data.add(sortData);
+                }
+                if (withMy)
+                    data.add(0, new MovieSort.SortData("my0", "主页"));
+                Collections.sort(data);
+                return data;
+            }
             ArrayList<String> categories = sb.getCategories();
             if (!categories.isEmpty()) {
                 for (String cate : categories) {

@@ -21,6 +21,7 @@ public class RefreshEvent {
     public static final int TYPE_SUBTITLE_SIZE_CHANGE = 12;
     public static final int TYPE_FILTER_CHANGE = 13;
     public static final int TYPE_LIVE_API_URL_CHANGE = 14;
+    public static final int TYPE_HOME_SOURCE_CHANGE = 15;
     public static final int TYPE_SET_DANMU_SETTINGS = 18;
     public static final int TYPE_DANMU_REFRESH = 19;
     public int type;

@@ -97,4 +97,5 @@ lint/tmp/
 .idea/
 
 *.hprof
+*.md
 output-metadata.json

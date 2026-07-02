@@ -94,7 +94,7 @@ public class UserFragment extends BaseLazyFragment implements View.OnClickListen
             tvHotList.setVisibility(View.VISIBLE);
             tvHotList.setHasFixedSize(true);
             int spanCount = 5;
-            if(style!=null && Hawk.get(HawkConfig.HOME_REC, 0) == 1)spanCount=ImgUtil.spanCountByStyle(style,spanCount);
+            if(style!=null && Hawk.get(HawkConfig.HOME_REC, HawkConfig.DEFAULT_HOME_REC) == 1)spanCount=ImgUtil.spanCountByStyle(style,spanCount);
             tvHotList.setLayoutManager(new V7GridLayoutManager(this.mContext, spanCount));
             int paddingLeft = getResources().getDimensionPixelSize(R.dimen.vs_0);
             int paddingTop = getResources().getDimensionPixelSize(R.dimen.vs_20);
@@ -110,7 +110,7 @@ public class UserFragment extends BaseLazyFragment implements View.OnClickListen
             int paddingBottom = getResources().getDimensionPixelSize(R.dimen.vs_20);
             tvHotList.setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);
         }
-        if (Hawk.get(HawkConfig.HOME_REC, 0) == 2) {
+        if (Hawk.get(HawkConfig.HOME_REC, HawkConfig.DEFAULT_HOME_REC) == 2) {
             List<VodInfo> allVodRecord = RoomDataManger.getAllVodRecord(20);
             List<Movie.Video> vodList = new ArrayList<>();
             for (VodInfo vodInfo : allVodRecord) {
@@ -176,13 +176,13 @@ public class UserFragment extends BaseLazyFragment implements View.OnClickListen
         tvPush.setOnFocusChangeListener(focusChangeListener);
         tvCollect.setOnFocusChangeListener(focusChangeListener);
         tvHotList = findViewById(R.id.tvHotList);
-        if (Hawk.get(HawkConfig.HOME_REC, 0) == 1 && homeSourceRec!=null) {
+        if (Hawk.get(HawkConfig.HOME_REC, HawkConfig.DEFAULT_HOME_REC) == 1 && homeSourceRec!=null) {
             style=ImgUtil.initStyle();
         }
         String tvRate="";
-        if(Hawk.get(HawkConfig.HOME_REC, 0) == 0){
+        if(Hawk.get(HawkConfig.HOME_REC, HawkConfig.DEFAULT_HOME_REC) == 0){
             tvRate="豆瓣热播";
-        }else if(Hawk.get(HawkConfig.HOME_REC, 0) == 1){
+        }else if(Hawk.get(HawkConfig.HOME_REC, HawkConfig.DEFAULT_HOME_REC) == 1){
           tvRate= homeSourceRec!=null?"站点推荐":"豆瓣热播";
         }
         homeHotVodAdapter = new HomeHotVodAdapter(style,tvRate);
@@ -193,12 +193,12 @@ public class UserFragment extends BaseLazyFragment implements View.OnClickListen
                     return;
                 Movie.Video vod = ((Movie.Video) adapter.getItem(position));
 
-                if (Hawk.get(HawkConfig.HOME_REC, 0) == 1 && homeSourceRec != null && vod.action != null) {
+                if (Hawk.get(HawkConfig.HOME_REC, HawkConfig.DEFAULT_HOME_REC) == 1 && homeSourceRec != null && vod.action != null) {
                     sourceViewModel.action(vod.sourceKey, vod.action);
                     return;
                 }
 
-                if ((vod.id != null && !vod.id.isEmpty()) && (Hawk.get(HawkConfig.HOME_REC, 0) == 2) && HawkConfig.hotVodDelete) {
+                if ((vod.id != null && !vod.id.isEmpty()) && (Hawk.get(HawkConfig.HOME_REC, HawkConfig.DEFAULT_HOME_REC) == 2) && HawkConfig.hotVodDelete) {
                     homeHotVodAdapter.remove(position);
                     VodInfo vodInfo = RoomDataManger.getVodInfo(vod.sourceKey, vod.id);
                     assert vodInfo != null;
@@ -230,7 +230,7 @@ public class UserFragment extends BaseLazyFragment implements View.OnClickListen
                 Movie.Video vod = ((Movie.Video) adapter.getItem(position));
                 // Additional Check if : Home Rec 0=豆瓣, 1=推荐, 2=历史
                 assert vod != null;
-                if ((vod.id != null && !vod.id.isEmpty()) && (Hawk.get(HawkConfig.HOME_REC, 0) == 2)) {
+                if ((vod.id != null && !vod.id.isEmpty()) && (Hawk.get(HawkConfig.HOME_REC, HawkConfig.DEFAULT_HOME_REC) == 2)) {
                     HawkConfig.hotVodDelete = !HawkConfig.hotVodDelete;
                     homeHotVodAdapter.notifyDataSetChanged();
                 } else {
@@ -272,12 +272,12 @@ public class UserFragment extends BaseLazyFragment implements View.OnClickListen
     }
 
     private void initHomeHotVod(HomeHotVodAdapter adapter) {
-        if (Hawk.get(HawkConfig.HOME_REC, 0) == 1) {
+        if (Hawk.get(HawkConfig.HOME_REC, HawkConfig.DEFAULT_HOME_REC) == 1) {
             if (homeSourceRec != null) {
                 adapter.setNewData(homeSourceRec);
                 return;
             }
-        } else if (Hawk.get(HawkConfig.HOME_REC, 0) == 2) {
+        } else if (Hawk.get(HawkConfig.HOME_REC, HawkConfig.DEFAULT_HOME_REC) == 2) {
             return;
         }
         setDouBanData(adapter);
@@ -371,11 +371,7 @@ public class UserFragment extends BaseLazyFragment implements View.OnClickListen
     
         FastClickCheckUtil.check(v);
         if (v.getId() == R.id.tvLive) {
-            if(Hawk.get(HawkConfig.LIVE_GROUP_LIST,new JsonArray()).isEmpty()){
-                Toast.makeText(mContext, "直播源为空", Toast.LENGTH_SHORT).show();
-            }else {
-                jumpActivity(LivePlayActivity.class);
-            }
+            jumpActivity(LivePlayActivity.class);
         } else if (v.getId() == R.id.tvSearch) {
             jumpActivity(SearchActivity.class);
         } else if (v.getId() == R.id.tvSetting) {

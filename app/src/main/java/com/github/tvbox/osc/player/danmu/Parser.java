@@ -7,6 +7,7 @@ import com.github.tvbox.osc.bean.Danmu;
 import com.github.tvbox.osc.util.DanmuHelper;
 import com.github.tvbox.osc.util.FileUtils;
 import com.github.tvbox.osc.util.LOG;
+import com.github.tvbox.osc.util.OkGoHelper;
 import com.github.tvbox.osc.util.SSL.SSLSocketFactoryCompat;
 
 import org.json.JSONArray;
@@ -68,8 +69,8 @@ public class Parser extends BaseDanmakuParser {
             return true;
         }
     };
-    private static final OkHttpClient HTTP_CLIENT = buildHttpClient(false);
-    private static final OkHttpClient UNSAFE_HTTP_CLIENT = buildHttpClient(true);
+    private static volatile OkHttpClient HTTP_CLIENT = buildHttpClient(false);
+    private static volatile OkHttpClient UNSAFE_HTTP_CLIENT = buildHttpClient(true);
     private final Danmu danmu;
     private final CancelChecker cancelChecker;
     private float scaleX;
@@ -159,17 +160,23 @@ public class Parser extends BaseDanmakuParser {
     }
 
     private static OkHttpClient buildHttpClient(boolean unsafeSsl) {
-        OkHttpClient.Builder builder = new OkHttpClient.Builder()
-                .readTimeout(HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-                .writeTimeout(HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-                .connectTimeout(HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-                .retryOnConnectionFailure(true);
+        OkHttpClient base = OkGoHelper.getDefaultClient();
+        OkHttpClient.Builder builder = base != null ? base.newBuilder() : new OkHttpClient.Builder().proxySelector(OkGoHelper.proxySelector()).proxyAuthenticator(OkGoHelper.proxyAuthenticator());
+        builder.readTimeout(HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        builder.writeTimeout(HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        builder.connectTimeout(HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        builder.retryOnConnectionFailure(true);
         if (unsafeSsl) {
             SSLSocketFactory sslSocketFactory = new SSLSocketFactoryCompat(TRUST_ALL_CERT);
             builder.sslSocketFactory(sslSocketFactory, TRUST_ALL_CERT);
             builder.hostnameVerifier(TRUST_ALL_HOSTNAME);
         }
         return builder.build();
+    }
+
+    public static synchronized void resetHttpClient() {
+        HTTP_CLIENT = buildHttpClient(false);
+        UNSAFE_HTTP_CLIENT = buildHttpClient(true);
     }
 
     private okhttp3.Response executeHttp(String source) throws IOException {

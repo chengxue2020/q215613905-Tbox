@@ -26,7 +26,6 @@ import com.github.tvbox.osc.bean.IJKCode;
 import com.github.tvbox.osc.bean.SourceBean;
 import com.github.tvbox.osc.event.RefreshEvent;
 import com.github.tvbox.osc.player.thirdparty.RemoteTVBox;
-import com.github.tvbox.osc.ui.activity.HomeActivity;
 import com.github.tvbox.osc.ui.activity.LocalFileActivity;
 import com.github.tvbox.osc.ui.activity.SettingActivity;
 import com.github.tvbox.osc.ui.adapter.ApiHistoryDialogAdapter;
@@ -156,7 +155,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
         refreshApiLineText();
 
         tvDns.setText(OkGoHelper.dnsHttpsList.get(Hawk.get(HawkConfig.DOH_URL, 0)));
-        tvHomeRec.setText(getHomeRecName(Hawk.get(HawkConfig.HOME_REC, 0)));
+        tvHomeRec.setText(getHomeRecName(Hawk.get(HawkConfig.HOME_REC, HawkConfig.DEFAULT_HOME_REC)));
         tvHistoryNum.setText(HistoryHelper.getHistoryNumName(Hawk.get(HawkConfig.HISTORY_NUM, 0)));
         tvSearchView.setText(getSearchView(Hawk.get(HawkConfig.SEARCH_VIEW, 0)));
         tvHomeApi.setText(ApiConfig.get().getHomeSourceBean().getName());
@@ -255,15 +254,10 @@ public class ModelSettingFragment extends BaseLazyFragment {
                     dialog.setAdapter(new SelectDialogAdapter.SelectDialogInterface<SourceBean>() {
                         @Override
                         public void click(SourceBean value, int pos) {
+                            dialog.dismiss();
                             ApiConfig.get().setSourceBean(value);
                             tvHomeApi.setText(ApiConfig.get().getHomeSourceBean().getName());
-
-                            Intent intent =new Intent(mContext, HomeActivity.class);
-                            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                            Bundle bundle = new Bundle();
-                            bundle.putBoolean("useCache", true);
-                            intent.putExtras(bundle);
-                            startActivity(intent);
+                            EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_HOME_SOURCE_CHANGE));
                         }
 
                         @Override
@@ -300,6 +294,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
                         Hawk.put(HawkConfig.DOH_URL, pos);
 //                        String url = OkGoHelper.getDohUrl(pos);
 //                        OkGoHelper.dnsOverHttps.setUrl(url.isEmpty() ? null : HttpUrl.get(url));
+                        OkGoHelper.reloadDns();
                         IjkMediaPlayer.toggleDotPort(pos > 0);
                     }
 
@@ -613,7 +608,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
             @Override
             public void onClick(View v) {
                 FastClickCheckUtil.check(v);
-                int defaultPos = Hawk.get(HawkConfig.HOME_REC, 0);
+                int defaultPos = Hawk.get(HawkConfig.HOME_REC, HawkConfig.DEFAULT_HOME_REC);
                 ArrayList<Integer> types = new ArrayList<>();
                 types.add(0);
                 types.add(1);
@@ -861,17 +856,19 @@ public class ModelSettingFragment extends BaseLazyFragment {
     }
 
     private void restartAppAfterConfigChanged() {
-        Toast.makeText(mContext, "配置已切换,即将自动重启应用!", Toast.LENGTH_SHORT).show();
+        Toast.makeText(mContext, "配置已切换,即将重新加载!", Toast.LENGTH_SHORT).show();
         new Handler().postDelayed(new Runnable() {
             @Override
             public void run() {
-                restartApp();
+                if (mActivity != null && !mActivity.isFinishing()) {
+                    mActivity.onBackPressed();
+                }
             }
         }, 2500);
     }
 
     private void restartAppAfterCacheCleared() {
-        Toast.makeText(mContext, "缓存已清空,即将重启到主页!", Toast.LENGTH_LONG).show();
+        Toast.makeText(mContext, "缓存已清空,即将回到主页!", Toast.LENGTH_LONG).show();
         new Handler().postDelayed(new Runnable() {
             @Override
             public void run() {
@@ -1095,15 +1092,11 @@ public class ModelSettingFragment extends BaseLazyFragment {
         FastClickCheckUtil.check(v);
         String cachePath = FileUtils.getCachePath();
         File cacheDir = new File(cachePath);
-        String cspCachePath = FileUtils.getFilePath()+"/csp/";
-        File cspCacheDir = new File(cspCachePath);
-        ApiConfig.get().clearSpiderCache();
         new Thread(() -> {
             try {
+                ApiConfig.get().clearSpiderCache();
                 if(cacheDir.exists())FileUtils.cleanDirectory(cacheDir);
-                if(cspCacheDir.exists()){
-                    FileUtils.cleanDirectory(cspCacheDir);
-                }
+                FileUtils.clearSpiderCacheFiles();
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {

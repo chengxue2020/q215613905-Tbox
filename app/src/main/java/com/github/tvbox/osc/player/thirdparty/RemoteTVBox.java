@@ -8,6 +8,7 @@ import com.github.tvbox.osc.bean.IpScanningVo;
 import com.github.tvbox.osc.server.RemoteServer;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.IpScanning;
+import com.github.tvbox.osc.util.OkGoHelper;
 import com.orhanobut.hawk.Hawk;
 
 import java.io.IOException;
@@ -126,7 +127,8 @@ public class RemoteTVBox {
     }
 
     public static void post(String url, Map<String, String> params, okhttp3.Callback callback) {
-        OkHttpClient.Builder builder = new OkHttpClient.Builder();
+        OkHttpClient base = OkGoHelper.getDefaultClient();
+        OkHttpClient.Builder builder = base != null ? base.newBuilder() : new OkHttpClient.Builder().proxySelector(OkGoHelper.proxySelector()).proxyAuthenticator(OkGoHelper.proxyAuthenticator());
         builder.readTimeout(1000, TimeUnit.MILLISECONDS);
         builder.writeTimeout(1000, TimeUnit.MILLISECONDS);
         builder.connectTimeout(1000, TimeUnit.MILLISECONDS);

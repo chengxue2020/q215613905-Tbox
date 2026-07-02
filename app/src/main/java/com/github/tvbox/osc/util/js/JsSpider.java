@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class JsSpider extends Spider {
@@ -62,6 +63,7 @@ public class JsSpider extends Spider {
     private final String api;
     private boolean cat;
     private byte[] emptyModuleBytecode;
+    private final AtomicBoolean destroyed = new AtomicBoolean(false);
 
     public JsSpider(String key, String api, Class<?> cls) throws Exception {
         this.key = "J" + MD5.encode(key);
@@ -75,7 +77,7 @@ public class JsSpider extends Spider {
     }
 
     private void submit(Runnable runnable) {
-        executor.submit(runnable);
+        if (!destroyed.get()) executor.submit(runnable);
     }
 
     private <T> Future<T> submit(Callable<T> callable) {
@@ -84,6 +86,7 @@ public class JsSpider extends Spider {
 
     private Object call(String func, Object... args) {
 //        return executor.submit((FunCall.call(jsObject, func, args))).get();
+        if (destroyed.get() || jsObject == null) return null;
         try {
             return submit(() -> Async.run(jsObject, func, args).get()).get();  // 等待 executor 线程完成 JS 调用
         } catch (InterruptedException | ExecutionException e) {
@@ -217,10 +220,21 @@ public class JsSpider extends Spider {
 
     @Override
     public void destroy() {
-        submit(() -> {
+        if (!destroyed.compareAndSet(false, true)) return;
+        try {
+            executor.submit(() -> {
+                try {
+                    jsObject = null;
+                    if (ctx != null) ctx.destroy();
+                } catch (Throwable th) {
+                    LOG.i("echo-js-destroy-error " + th.getMessage());
+                } finally {
+                    executor.shutdown();
+                }
+            });
+        } catch (Throwable th) {
             executor.shutdownNow();
-            ctx.destroy();
-        });
+        }
     }
 
     private static final String SPIDER_STRING_CODE = "import * as spider from '%s'\n\n" +
@@ -263,6 +277,7 @@ public class JsSpider extends Spider {
                 //ctx.evaluate("globalThis." + key + " = __JS_SPIDER__;");                
             }
             jsObject = (JSObject) ctx.get(ctx.getGlobalObject(), key);
+            if (jsObject != null) jsObject.hold();
             return null;
         }).get();
     }

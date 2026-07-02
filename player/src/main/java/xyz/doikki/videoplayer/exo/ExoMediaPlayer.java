@@ -27,13 +27,9 @@ import com.google.android.exoplayer2.util.Clock;
 import com.google.android.exoplayer2.util.EventLogger;
 import com.google.android.exoplayer2.video.VideoSize;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 
-import okhttp3.Dns;
-import okhttp3.OkHttpClient;
 import xyz.doikki.videoplayer.player.AbstractPlayer;
 import xyz.doikki.videoplayer.player.VideoViewManager;
 import xyz.doikki.videoplayer.util.PlayerUtils;
@@ -56,6 +52,8 @@ public class ExoMediaPlayer extends AbstractPlayer implements Player.Listener {
     protected DefaultTrackSelector trackSelector;
 
     protected String currentPlayPath;
+    protected Map<String, String> currentHeaders;
+    private boolean mRetriedAsHls;
 
     public ExoMediaPlayer(Context context) {
         mAppContext = context.getApplicationContext();
@@ -108,7 +106,9 @@ public class ExoMediaPlayer extends AbstractPlayer implements Player.Listener {
     public void setDataSource(String path, Map<String, String> headers) {
         Log.i("Tvbox-runtime","echo-setDataSource:"+path);
         currentPlayPath = path;
-        mMediaSource = mMediaSourceHelper.getMediaSource(path, headers);
+        currentHeaders = copyHeaders(headers);
+        mRetriedAsHls = false;
+        mMediaSource = mMediaSourceHelper.getMediaSource(path, copyHeaders(currentHeaders));
     }
 
     @Override
@@ -157,6 +157,7 @@ public class ExoMediaPlayer extends AbstractPlayer implements Player.Listener {
             mInternalPlayer.clearMediaItems();
             mInternalPlayer.setVideoSurface(null);
             mIsPreparing = false;
+            mRetriedAsHls = false;
         }
     }
 
@@ -294,10 +295,43 @@ public class ExoMediaPlayer extends AbstractPlayer implements Player.Listener {
 
     @Override
     public void onPlayerError(PlaybackException error) {
-        Log.e("Tvbox-runtime", "Exo player error: " + currentPlayPath, error);
+        Log.e("Tvbox-runtime", "echo-Exo player error: " + currentPlayPath, error);
+        if (retryAsHls(error)) {
+            return;
+        }
         if (mPlayerEventListener != null) {
             mPlayerEventListener.onError();
         }
+    }
+
+    private boolean retryAsHls(PlaybackException error) {
+        if (mRetriedAsHls || mInternalPlayer == null || currentPlayPath == null) {
+            return false;
+        }
+        if (!isParsingError(error)) {
+            return false;
+        }
+        mRetriedAsHls = true;
+        Log.i("Tvbox-runtime", "echo-Exo retry as HLS: " + currentPlayPath);
+        mMediaSource = mMediaSourceHelper.getHlsMediaSource(currentPlayPath, copyHeaders(currentHeaders));
+        mIsPreparing = true;
+        mInternalPlayer.setMediaSource(mMediaSource);
+        mInternalPlayer.prepare();
+        mInternalPlayer.setPlayWhenReady(true);
+        return true;
+    }
+
+    private boolean isParsingError(PlaybackException error) {
+        int errorCode = error.errorCode;
+        return errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED
+                || errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED
+                || errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED
+                || errorCode == PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED
+                || errorCode == PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED;
+    }
+
+    private Map<String, String> copyHeaders(Map<String, String> headers) {
+        return headers == null ? null : new HashMap<>(headers);
     }
 
     @Override

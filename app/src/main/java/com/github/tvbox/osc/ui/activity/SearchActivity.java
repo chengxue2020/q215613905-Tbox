@@ -550,12 +550,18 @@ public class SearchActivity extends BaseActivity {
     }
 
     private static ArrayList<String> hots;
+    private static boolean hotWordsRequested;
 
     private void useDefaultHotWords() {
-        hots = new ArrayList<>();
+        ArrayList<String> data = new ArrayList<>();
         for (String word : DEFAULT_HOT_WORDS) {
-            hots.add(word);
+            data.add(word);
         }
+        cacheHotWords(data);
+    }
+
+    private void cacheHotWords(ArrayList<String> data) {
+        hots = data;
         setHotWordsData(hots);
     }
 
@@ -596,6 +602,10 @@ public class SearchActivity extends BaseActivity {
             setHotWordsData(hots);
             return;
         }
+        if (hotWordsRequested) {
+            return;
+        }
+        hotWordsRequested = true;
         // 加载热词
         OkGo.<String>get(HOT_SEARCH_URL)
 //        OkGo.<String>get("https://api.web.360kan.com/v1/rank")
@@ -605,20 +615,20 @@ public class SearchActivity extends BaseActivity {
                     @Override
                     public void onSuccess(Response<String> response) {
                         try {
-                            hots = new ArrayList<String>();
+                            ArrayList<String> data = new ArrayList<String>();
                             JsonArray itemList = JsonParser.parseString(response.body()).getAsJsonObject().get("subjects").getAsJsonArray();
 //                            JsonArray itemList = JsonParser.parseString(response.body()).getAsJsonObject().get("data").getAsJsonArray();
                             for (JsonElement ele : itemList) {
                                 JsonObject obj = (JsonObject) ele;
                                 if (obj.has("title")) {
-                                    addHotWord(hots, obj.get("title").getAsString());
+                                    addHotWord(data, obj.get("title").getAsString());
                                 }
                             }
-                            if (hots.isEmpty()) {
+                            if (data.isEmpty()) {
                                 useDefaultHotWords();
                                 return;
                             }
-                            setHotWordsData(hots);
+                            cacheHotWords(data);
                         } catch (Throwable th) {
                             th.printStackTrace();
                             useDefaultHotWords();

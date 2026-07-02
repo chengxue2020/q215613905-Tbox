@@ -338,7 +338,10 @@ public class GridFragment extends BaseLazyFragment {
             public void onChanged(JSONObject jsonObject) {
                 if (jsonObject == null) return;
                 String msg = jsonObject.optString("msg");
-                if (!msg.isEmpty()) Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+                if (!msg.isEmpty()) {
+                    Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+                    forceRefresh();
+                }
             }
         });
     }
@@ -458,6 +461,7 @@ public class GridFragment extends BaseLazyFragment {
     }
 
     public void forceRefresh() {
+        if (isRequesting) return;
         page = 1;
         initData();
     }

@@ -38,9 +38,14 @@ public class QuickJSContext {
 
     public void destroyContext() {
         checkSameThread();
+        if (destroyed) {
+            return;
+        }
 
         nativeCleaner.forceClean();
+        callFunctionMap.clear();
         destroyContext(context);
+        destroyed = true;
     }
 
     public void setProperty(JSObject jsObj, String name, Object value) {
@@ -378,6 +383,14 @@ public class QuickJSContext {
     }
 
     public Object execute(byte[] code, String fileName) {
+        checkSameThread();
+        checkDestroyed();
+        if (shouldSkipUnsafeWvSpiderCall()) {
+            return null;
+        }
+        if (code == null || code.length == 0) {
+            return null;
+        }
         return execute(context, code, fileName, "default");
     }
 
@@ -388,6 +401,12 @@ public class QuickJSContext {
     public Object execute(byte[] code, String fileName, String moduleExtName) {
         checkSameThread();
         checkDestroyed();
+        if (shouldSkipUnsafeWvSpiderCall()) {
+            return null;
+        }
+        if (code == null || code.length == 0) {
+            return null;
+        }
 
         if (TextUtils.isEmpty(moduleExtName)) {
             moduleExtName = "default";
@@ -402,12 +421,38 @@ public class QuickJSContext {
     public Object evaluate(String script, String fileName) {
         checkSameThread();
         checkDestroyed();
-        return evaluate(context, script, fileName, "default", false);
+        if (shouldSkipUnsafeWvSpiderCall()) {
+            return null;
+        }
+        if (TextUtils.isEmpty(script)) {
+            return null;
+        }
+        byte[] code = compile(context, script, fileName, false);
+        if (code == null || code.length == 0) {
+            return null;
+        }
+        return execute(context, code, fileName, "default");
+    }
+
+    private boolean shouldSkipUnsafeWvSpiderCall() {
+        StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+        for (StackTraceElement element : stackTrace) {
+            if ("com.github.catvod.spider.WvSpider".equals(element.getClassName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public Object evaluateModule(String script, String fileName, String moduleExtName) {
         checkSameThread();
         checkDestroyed();
+        if (shouldSkipUnsafeWvSpiderCall()) {
+            return null;
+        }
+        if (TextUtils.isEmpty(script)) {
+            return null;
+        }
 
         if (TextUtils.isEmpty(moduleExtName)) {
             moduleExtName = "default";
@@ -416,7 +461,7 @@ public class QuickJSContext {
     }
 
     public Object evaluateModule(String script, String fileName) {
-        return evaluate(context, script, fileName, "default", true);
+        return evaluateModule(script, fileName, "default");
     }
 
     public Object evaluateModule(String script) {

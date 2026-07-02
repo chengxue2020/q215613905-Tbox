@@ -200,6 +200,9 @@
 
 -keep class com.github.catvod.Proxy { *; }
 -keep class com.github.catvod.crawler.*{*;}
+-keep class com.github.catvod.net.** { *; }
+-keep class com.github.tvbox.osc.bean.ProxyRule { *; }
+-keep class com.github.tvbox.osc.util.net.** { *; }
 # 迅雷下载模块
 -keep class com.xunlei.downloadlib.** {*;}
 # quickjs引擎

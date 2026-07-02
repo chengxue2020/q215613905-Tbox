@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel;
 import com.github.tvbox.osc.bean.Subtitle;
 import com.github.tvbox.osc.bean.SubtitleData;
 import com.github.tvbox.osc.ui.dialog.SearchSubtitleDialog;
+import com.github.tvbox.osc.util.OkGoHelper;
 import com.lzy.okgo.OkGo;
 import com.lzy.okgo.callback.AbsCallback;
 
@@ -200,13 +201,14 @@ public class SubtitleViewModel extends ViewModel {
                 .addHeader("Referer", "https://secure.assrt.net")
                 .addHeader("User-Agent", ua)
                 .build();
-        OkHttpClient.Builder builder = new OkHttpClient.Builder()
-                .readTimeout(15, TimeUnit.SECONDS)
-                .writeTimeout(15, TimeUnit.SECONDS)
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .followRedirects(false)
-                .followSslRedirects(false)
-                .retryOnConnectionFailure(true);
+        OkHttpClient base = OkGoHelper.getDefaultClient();
+        OkHttpClient.Builder builder = base != null ? base.newBuilder() : new OkHttpClient.Builder().proxySelector(OkGoHelper.proxySelector()).proxyAuthenticator(OkGoHelper.proxyAuthenticator());
+        builder.readTimeout(15, TimeUnit.SECONDS);
+        builder.writeTimeout(15, TimeUnit.SECONDS);
+        builder.connectTimeout(15, TimeUnit.SECONDS);
+        builder.followRedirects(false);
+        builder.followSslRedirects(false);
+        builder.retryOnConnectionFailure(true);
         OkHttpClient client = builder.build();
         client.newCall(request).enqueue(new Callback() {
             @Override

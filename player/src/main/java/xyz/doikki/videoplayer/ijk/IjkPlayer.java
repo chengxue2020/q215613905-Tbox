@@ -15,6 +15,7 @@ import tv.danmaku.ijk.media.player.IMediaPlayer;
 import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 import tv.danmaku.ijk.media.player.misc.ITrackInfo;
 import tv.danmaku.ijk.media.player.misc.IjkTrackInfo;
+import xyz.doikki.videoplayer.exo.ExoMediaSourceHelper;
 import xyz.doikki.videoplayer.player.AbstractPlayer;
 import xyz.doikki.videoplayer.player.VideoViewManager;
 import xyz.doikki.videoplayer.util.PlayerUtils;
@@ -62,6 +63,7 @@ public class IjkPlayer extends AbstractPlayer implements IMediaPlayer.OnErrorLis
             } else {
                 //处理UA问题
                 if (headers != null) {
+                    headers.remove(ExoMediaSourceHelper.HEADER_FORMAT);
                     String userAgent = headers.get("User-Agent");
                     if (!TextUtils.isEmpty(userAgent)) {
                         mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", userAgent);

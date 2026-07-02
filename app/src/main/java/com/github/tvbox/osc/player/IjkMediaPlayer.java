@@ -23,6 +23,7 @@ import java.util.Map;
 import tv.danmaku.ijk.media.player.IMediaPlayer;
 import tv.danmaku.ijk.media.player.misc.ITrackInfo;
 import tv.danmaku.ijk.media.player.misc.IjkTrackInfo;
+import xyz.doikki.videoplayer.exo.ExoMediaSourceHelper;
 import xyz.doikki.videoplayer.ijk.IjkPlayer;
 
 public class IjkMediaPlayer extends IjkPlayer {
@@ -30,6 +31,8 @@ public class IjkMediaPlayer extends IjkPlayer {
     private IJKCode codec = null;
     protected String currentPlayPath;
     private static AudioTrackMemory memory;
+    private static final String DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36";
+    private static final String DEFAULT_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/json;q=0.9";
 
     public IjkMediaPlayer(Context context, IJKCode codec) {
         super(context);
@@ -164,26 +167,47 @@ public class IjkMediaPlayer extends IjkPlayer {
     }
 
     private void setDataSourceHeader(Map<String, String> headers) {
+        LinkedHashMap<String, String> playHeaders = new LinkedHashMap<>();
+        String userAgent = null;
+        boolean hasAccept = false;
         if (headers != null && !headers.isEmpty()) {
-            String userAgent = headers.get("User-Agent");
-            if (!TextUtils.isEmpty(userAgent)) {
-                mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", userAgent);
-                // 移除header中的User-Agent，防止重复
-                headers.remove("User-Agent");
-            }
-            if (headers.size() > 0) {
-                StringBuilder sb = new StringBuilder();
-                for (Map.Entry<String, String> entry : headers.entrySet()) {
-                    String value = entry.getValue();
-                    if (!TextUtils.isEmpty(value)) {
-                        sb.append(entry.getKey());
-                        sb.append(": ");
-                        sb.append(value);
-                        sb.append("\r\n");
-                    }
+            for (Map.Entry<String, String> entry : headers.entrySet()) {
+                String key = entry.getKey();
+                String value = entry.getValue();
+                if (TextUtils.isEmpty(key) || TextUtils.isEmpty(value)) {
+                    continue;
                 }
-                mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", sb.toString());
+                if (ExoMediaSourceHelper.HEADER_FORMAT.equalsIgnoreCase(key)) {
+                    continue;
+                }
+                if ("User-Agent".equalsIgnoreCase(key)) {
+                    userAgent = value.trim();
+                } else {
+                    if ("Accept".equalsIgnoreCase(key)) {
+                        hasAccept = true;
+                    }
+                    playHeaders.put(key, value.trim());
+                }
             }
+        }
+        if (TextUtils.isEmpty(userAgent)) {
+            userAgent = DEFAULT_USER_AGENT;
+        }
+        if (!hasAccept) {
+            playHeaders.put("Accept", DEFAULT_ACCEPT);
+        }
+        if (!TextUtils.isEmpty(userAgent)) {
+            mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", userAgent);
+        }
+        if (playHeaders.size() > 0) {
+            StringBuilder sb = new StringBuilder();
+            for (Map.Entry<String, String> entry : playHeaders.entrySet()) {
+                sb.append(entry.getKey());
+                sb.append(": ");
+                sb.append(entry.getValue());
+                sb.append("\r\n");
+            }
+            mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", sb.toString());
         }
     }
 

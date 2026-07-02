@@ -272,9 +272,9 @@
 <!--添加EPG显示，更改样式 by 龍-->
 
 
-	<LinearLayout
+    <LinearLayout
         android:id="@+id/tvRightSettingLayout"
-        android:layout_width="wrap_content"
+        android:layout_width="@dimen/vs_640"
         android:layout_height="match_parent"
         android:layout_margin="20dp"
         android:layout_gravity="right"
@@ -285,7 +285,7 @@
 
         <com.owen.tvrecyclerview.widget.TvRecyclerView
             android:id="@+id/mSettingItemView"
-            android:layout_width="@dimen/vs_340"
+            android:layout_width="@dimen/vs_420"
             android:layout_height="match_parent"
             android:divider="@null"
             android:fadeScrollbars="false"
@@ -306,7 +306,7 @@
 
         <com.owen.tvrecyclerview.widget.TvRecyclerView
             android:id="@+id/mSettingGroupView"
-            android:layout_width="@dimen/vs_220"
+            android:layout_width="@dimen/vs_200"
             android:layout_height="match_parent"
             android:divider="@null"
             android:fadeScrollbars="false"

@@ -92,6 +92,7 @@ public class VodController extends BaseController {
                         break;
                     }
                     case 1002: { // 显示底部菜单
+                        updateDanmuSearchUiBtn();
                         mBottomRoot.setVisibility(VISIBLE);
                         mTopRoot1.setVisibility(VISIBLE);
                         mTopRoot2.setVisibility(VISIBLE);
@@ -116,6 +117,10 @@ public class VodController extends BaseController {
                             net_play_speed.setVisibility(VISIBLE);
                         }
                         backBtn.setVisibility(INVISIBLE);
+                        mHandler.removeCallbacks(lockRunnable);
+                        if (mLockView != null) {
+                            mLockView.setVisibility(INVISIBLE);
+                        }
                         break;
                     }
                     case 1004: { // 设置速度
@@ -171,6 +176,7 @@ public class VodController extends BaseController {
     TextView mZimuBtn;
     TextView mAudioTrackBtn;
     TextView mDanmuSettingBtn;
+    TextView mDanmuSearchUiBtn;
     public TextView mLandscapePortraitBtn;
     private View backBtn;//返回键
     private boolean isClickBackBtn;
@@ -182,6 +188,7 @@ public class VodController extends BaseController {
 
     LockRunnable lockRunnable = new LockRunnable();
     private boolean isLock = false;
+    private boolean previewMode = false;
     Handler myHandle;
     Runnable myRunnable;
     int myHandleSeconds = 10000;//闲置多少毫秒秒关闭底栏  默认6秒
@@ -211,9 +218,26 @@ public class VodController extends BaseController {
     };
     
     private void showLockView() {
+        if (previewMode) {
+            mHandler.removeCallbacks(lockRunnable);
+            if (mLockView != null) {
+                mLockView.setVisibility(INVISIBLE);
+            }
+            return;
+        }
         mLockView.setVisibility(ScreenUtils.isTv(getContext()) ? INVISIBLE : VISIBLE);
         mHandler.removeCallbacks(lockRunnable);
-        mHandler.postDelayed(lockRunnable, 3000);
+        if (isLock) {
+            mHandler.postDelayed(lockRunnable, 3000);
+        }
+    }
+
+    public void setPreviewMode(boolean previewMode) {
+        this.previewMode = previewMode;
+        mHandler.removeCallbacks(lockRunnable);
+        if (mLockView != null) {
+            mLockView.setVisibility(INVISIBLE);
+        }
     }
 
     @Override
@@ -255,6 +279,8 @@ public class VodController extends BaseController {
         mZimuBtn = findViewById(R.id.zimu_select);
         mAudioTrackBtn = findViewById(R.id.audio_track_select);
         mDanmuSettingBtn = findViewById(R.id.danmu_setting);
+        mDanmuSearchUiBtn = findViewById(R.id.danmu_search_ui);
+        updateDanmuSearchUiBtn();
         mLandscapePortraitBtn = findViewById(R.id.landscape_portrait);
         backBtn = findViewById(R.id.tv_back);
         seekTime = findViewById(R.id.tv_seek_time);
@@ -286,6 +312,9 @@ public class VodController extends BaseController {
         rootView.setOnTouchListener(new OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
+                if (previewMode) {
+                    return false;
+                }
                 if (isLock) {
                     if (event.getAction() == MotionEvent.ACTION_UP) {
                         showLockView();
@@ -677,6 +706,21 @@ public class VodController extends BaseController {
                 listener.showDanmuSetting();
             }
         });
+        mDanmuSearchUiBtn.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                listener.searchDanmuUi(false);
+                hideBottom();
+            }
+        });
+        mDanmuSearchUiBtn.setOnLongClickListener(new OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View view) {
+                listener.searchDanmuUi(true);
+                hideBottom();
+                return true;
+            }
+        });
         mLandscapePortraitBtn.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -824,6 +868,11 @@ public class VodController extends BaseController {
         mDanmuSettingBtn.setVisibility(hasDanmu ? VISIBLE : GONE);
     }
 
+    public void updateDanmuSearchUiBtn() {
+        if (mDanmuSearchUiBtn == null) return;
+        mDanmuSearchUiBtn.setVisibility(ApiConfig.get().hasDanmuSearchUi() ? VISIBLE : GONE);
+    }
+
     public interface VodControlListener {
         void playNext(boolean rmProgress);
 
@@ -844,6 +893,8 @@ public class VodController extends BaseController {
         void selectAudioTrack();
 
         void showDanmuSetting();
+
+        void searchDanmuUi(boolean longClick);
 
         void startPlayUrl(String url, HashMap<String, String> headers);
 

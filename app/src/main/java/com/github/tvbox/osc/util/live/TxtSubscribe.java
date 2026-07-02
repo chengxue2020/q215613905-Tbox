@@ -15,6 +15,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class TxtSubscribe {
+    public static final String DEFAULT_GROUP_NAME = "直播";
+    private static final String LEGACY_DEFAULT_GROUP_NAME = "Ungrouped";
     private static final Pattern NAME_PATTERN = Pattern.compile(".*,(.+?)$");
     private static final Pattern GROUP_PATTERN = Pattern.compile("group-title=\"(.*?)\"");
     private static final Pattern TVG_CHNO_PATTERN = Pattern.compile("tvg-chno=\"(.*?)\"");
@@ -33,7 +35,7 @@ public class TxtSubscribe {
         if (array == null) return;
         for (JsonElement groupElement : array) {
             JsonObject groupObj = groupElement.getAsJsonObject();
-            String groupName = DefaultConfig.safeJsonString(groupObj, "group", "Ungrouped");
+            String groupName = normalizeGroupName(DefaultConfig.safeJsonString(groupObj, "group", DEFAULT_GROUP_NAME));
             LinkedHashMap<String, ArrayList<String>> channelMap = new LinkedHashMap<>();
             if (groupObj.has("channels")) {
                 for (JsonElement channelElement : groupObj.getAsJsonArray("channels")) {
@@ -71,9 +73,17 @@ public class TxtSubscribe {
         for (JsonElement groupElement : groups) {
             JsonObject groupObj = groupElement.getAsJsonObject();
             JsonObject outGroup = new JsonObject();
-            outGroup.addProperty("group", DefaultConfig.safeJsonString(groupObj, "group", "Ungrouped"));
-            if (groupObj.has("channels")) {
-                for (JsonElement channelElement : groupObj.getAsJsonArray("channels")) {
+            String groupName = DefaultConfig.safeJsonString(groupObj, "group", "");
+            if (groupName.isEmpty()) groupName = DefaultConfig.safeJsonString(groupObj, "name", DEFAULT_GROUP_NAME);
+            outGroup.addProperty("group", normalizeGroupName(groupName));
+            JsonArray channels = null;
+            if (groupObj.has("channels") && groupObj.get("channels").isJsonArray()) {
+                channels = groupObj.getAsJsonArray("channels");
+            } else if (groupObj.has("channel") && groupObj.get("channel").isJsonArray()) {
+                channels = groupObj.getAsJsonArray("channel");
+            }
+            if (channels != null) {
+                for (JsonElement channelElement : channels) {
                     JsonObject channelObj = channelElement.getAsJsonObject();
                     JsonObject outChannel = new JsonObject();
                     copyIfExists(channelObj, outChannel, "name");
@@ -127,7 +137,7 @@ public class TxtSubscribe {
                 }
                 if (line.startsWith("#EXTINF") || line.contains("#EXTINF")) {
                     String groupName = get(line, GROUP_PATTERN);
-                    if (groupName.isEmpty()) groupName = "Ungrouped";
+                    groupName = normalizeGroupName(groupName);
                     currentGroup = findOrCreateGroup(result, groupName);
                     pendingChannel = new JsonObject();
                     pendingChannel.addProperty("name", get(line, NAME_PATTERN));
@@ -137,7 +147,7 @@ public class TxtSubscribe {
                     continue;
                 }
                 if (line.startsWith("#")) continue;
-                if (currentGroup == null) currentGroup = findOrCreateGroup(result, "Ungrouped");
+                if (currentGroup == null) currentGroup = findOrCreateGroup(result, DEFAULT_GROUP_NAME);
                 if (pendingChannel == null) pendingChannel = new JsonObject();
                 String[] parts = line.split("\\|", 2);
                 String url = parts[0].trim();
@@ -179,7 +189,7 @@ public class TxtSubscribe {
                 }
                 String[] split = line.split(",", 2);
                 if (split.length < 2) continue;
-                if (currentGroup == null) currentGroup = findOrCreateGroup(result, "Ungrouped");
+                if (currentGroup == null) currentGroup = findOrCreateGroup(result, DEFAULT_GROUP_NAME);
                 JsonObject channel = new JsonObject();
                 channel.addProperty("name", split[0].trim());
                 mergeMeta(channel, pendingMeta);
@@ -215,6 +225,7 @@ public class TxtSubscribe {
     }
 
     private static JsonObject findOrCreateGroup(JsonArray result, String name) {
+        name = normalizeGroupName(name);
         for (JsonElement element : result) {
             JsonObject group = element.getAsJsonObject();
             if (name.equals(group.get("group").getAsString())) return group;
@@ -224,6 +235,13 @@ public class TxtSubscribe {
         group.add("channels", new JsonArray());
         result.add(group);
         return group;
+    }
+
+    public static String normalizeGroupName(String name) {
+        if (name == null) return DEFAULT_GROUP_NAME;
+        name = name.trim();
+        if (name.isEmpty() || LEGACY_DEFAULT_GROUP_NAME.equalsIgnoreCase(name)) return DEFAULT_GROUP_NAME;
+        return name;
     }
 
     private static void addChannel(JsonObject group, JsonObject channel) {

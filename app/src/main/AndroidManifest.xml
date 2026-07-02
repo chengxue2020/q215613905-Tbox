@@ -52,10 +52,6 @@
             android:configChanges="orientation|screenSize"
             android:screenOrientation="sensorLandscape" />
         <activity
-            android:name=".ui.activity.PlayActivity"
-            android:configChanges="orientation|screenSize"
-            android:screenOrientation="sensorLandscape" />
-        <activity
             android:name=".ui.activity.PushActivity"
             android:screenOrientation="sensorLandscape" />
         <activity
