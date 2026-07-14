@@ -46,6 +46,7 @@ import com.github.tvbox.osc.util.HistoryHelper;
 import com.github.tvbox.osc.util.LOG;
 import com.github.tvbox.osc.util.OkGoHelper;
 import com.github.tvbox.osc.util.PlayerHelper;
+import com.github.tvbox.osc.viewmodel.SourceViewModel;
 import com.lzy.okgo.OkGo;
 import com.lzy.okgo.callback.FileCallback;
 import com.lzy.okgo.model.Progress;
@@ -857,6 +858,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
 
     private void restartAppAfterConfigChanged() {
         Toast.makeText(mContext, "配置已切换,即将重新加载!", Toast.LENGTH_SHORT).show();
+        clearConfigSwitchCache();
         new Handler().postDelayed(new Runnable() {
             @Override
             public void run() {
@@ -865,6 +867,17 @@ public class ModelSettingFragment extends BaseLazyFragment {
                 }
             }
         }, 2500);
+    }
+
+    private void clearConfigSwitchCache() {
+        try {
+            SourceViewModel.clearRuntimeCache();
+//            FileUtils.clearSpiderCacheFiles();
+            LOG.i("echo-clear-config-switch-cache");
+        } catch (Exception e) {
+            LOG.i("echo-clear-config-switch-cache-error:" + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     private void restartAppAfterCacheCleared() {

@@ -61,6 +61,9 @@
 
 -keep class org.xmlpull.v1.** {*;}
 
+-dontwarn org.fourthline.cling.**
+-keep class org.fourthline.cling.** { *; }
+
 # 保留R下面的资源
 -keep class **.R$* {*;}
 

@@ -61,9 +61,8 @@ def registerPluginAlias(alias,fileName):
 def loadFromDisk(fileName):
     name = fileName.split('/')[-1].split('.')[0]
     spList = gParam['SpiderList']
-    if name not in spList:
-        sp = SourceFileLoader(name, fileName).load_module().Spider()
-        spList[name] = sp
+    sp = SourceFileLoader(name, fileName).load_module().Spider()
+    spList[name] = sp
     return spList[name]
 
 def str2json(content):

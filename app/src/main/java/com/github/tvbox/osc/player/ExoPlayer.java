@@ -6,13 +6,17 @@ import android.util.Pair;
 import com.github.tvbox.osc.util.AudioTrackMemory;
 import com.github.tvbox.osc.util.LOG;
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.DefaultLoadControl;
+import com.google.android.exoplayer2.DefaultRenderersFactory;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.RenderersFactory;
 import com.google.android.exoplayer2.Tracks;
 import com.google.android.exoplayer2.source.TrackGroup;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.trackselection.MappingTrackSelector;
 
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -24,7 +28,30 @@ public class ExoPlayer extends ExoMediaPlayer {
 
     public ExoPlayer(Context context) {
         super(context);
+        setLoadControl(new DefaultLoadControl.Builder()
+                .setBufferDurationsMs(
+                        DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
+                        DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
+                        DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
+                        DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS)
+                .build());
+        setRenderersFactory(buildRenderersFactory(context));
+        LOG.i("echo-exo-low-memory-load-control");
         memory = AudioTrackMemory.getInstance(context);
+    }
+
+    private RenderersFactory buildRenderersFactory(Context context) {
+        DefaultRenderersFactory factory = new DefaultRenderersFactory(context)
+                .setEnableDecoderFallback(true)
+                .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER);
+        try {
+            Method method = DefaultRenderersFactory.class.getMethod("forceDisableMediaCodecAsynchronousQueueing");
+            method.invoke(factory);
+            LOG.i("echo-exo-disable-async-codec-queue");
+        } catch (Throwable th) {
+            LOG.i("echo-exo-disable-async-codec-queue-skip:" + th.getClass().getSimpleName());
+        }
+        return factory;
     }
 
     public TrackInfo getTrackInfo() {

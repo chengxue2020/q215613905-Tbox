@@ -158,7 +158,6 @@ public class TxtSubscribe {
                 if (!containsUrl(urls, url)) urls.add(url);
                 pendingChannel.add("urls", urls);
                 addChannel(currentGroup, pendingChannel);
-                pendingChannel = null;
                 pendingMeta = new JsonObject();
             }
             reader.close();

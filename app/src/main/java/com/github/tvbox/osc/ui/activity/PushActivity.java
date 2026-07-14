@@ -3,18 +3,15 @@ package com.github.tvbox.osc.ui.activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
-import android.content.Intent;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.base.BaseActivity;
+import com.github.tvbox.osc.receiver.PushReceiver;
 import com.github.tvbox.osc.server.ControlManager;
 import com.github.tvbox.osc.ui.tv.QRCodeGen;
-
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import me.jessyan.autosize.utils.AutoSizeUtils;
 
@@ -45,12 +42,8 @@ public class PushActivity extends BaseActivity {
                     if (manager != null) {
                         if (manager.hasPrimaryClip() && manager.getPrimaryClip() != null && manager.getPrimaryClip().getItemCount() > 0) {
                             ClipData.Item addedText = manager.getPrimaryClip().getItemAt(0);
-                            String clipText = addedText.getText().toString().trim();
-                            Intent newIntent = new Intent(mContext, DetailActivity.class);
-                            newIntent.putExtra("id", clipText);
-                            newIntent.putExtra("sourceKey", "push_agent");
-                            newIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                            PushActivity.this.startActivity(newIntent);
+                            CharSequence text = addedText.coerceToText(PushActivity.this);
+                            if (text != null) PushReceiver.send(PushActivity.this, text.toString().trim());
                         }
                     }
                 } catch (Throwable th) {

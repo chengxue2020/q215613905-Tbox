@@ -11,7 +11,7 @@ import com.github.catvod.net.OkHttp;
 import com.github.tvbox.osc.util.DanmuHelper;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.LOG;
-import com.github.tvbox.osc.util.js.Trans;
+import com.github.catvod.crawler.js.Trans;
 import com.orhanobut.hawk.Hawk;
 
 import org.json.JSONArray;
@@ -28,7 +28,8 @@ import okhttp3.Response;
 
 public class DanmakuApi {
     private static final String TAG = DanmakuApi.class.getSimpleName();
-    private static final String BUILTIN_API = "https://saas-oa.shyeguang.cn";
+//    private static final String BUILTIN_API = "https://saas-oa.shyeguang.cn";
+    private static final String BUILTIN_API = "https://logvardanmu.konfan.cn/87654321";
     private static final String USE_DEFAULT_KEY = "danmu_api_use_default";
     private static final long BUILTIN_TIMEOUT = TimeUnit.SECONDS.toMillis(20);
     private static final int BUILTIN_MAX_RETRY = 2;
@@ -46,6 +47,11 @@ public class DanmakuApi {
 
     public static boolean canSearch() {
         return DanmuHelper.isOpen() && !TextUtils.isEmpty(getApiUrl());
+    }
+
+    public static boolean hasCustomApi() {
+        String custom = Hawk.get(HawkConfig.DANMU_API, "");
+        return !isUseDefault() && !TextUtils.isEmpty(custom) && !TextUtils.isEmpty(custom.trim());
     }
 
     public static String getDisplayApiUrl() {
@@ -78,7 +84,7 @@ public class DanmakuApi {
             OkHttp.cancel(TAG);
             int seq = searchSeq.incrementAndGet();
 //            LOG.i("echo-danmaku search title: " + safeLog(name) + ", episode: " + safeLog(episode));
-            if (!hasPlaceholder(apiUrl)) {
+            if (!hasPlaceholder(apiUrl) && !isDanmakuSearchApi(apiUrl)) {
                 searchBuiltin(apiUrl, name, episode, callback, 0, seq);
                 return;
             }
@@ -326,6 +332,12 @@ public class DanmakuApi {
 
     private static boolean hasPlaceholder(String apiUrl) {
         return !TextUtils.isEmpty(apiUrl) && (apiUrl.contains("{name}") || apiUrl.contains("{episode}"));
+    }
+
+    private static boolean isDanmakuSearchApi(String apiUrl) {
+        String url = apiUrl == null ? "" : apiUrl.trim();
+        while (url.endsWith("/")) url = url.substring(0, url.length() - 1);
+        return url.endsWith("/danmaku");
     }
 
     private static String normalizeBaseUrl(String apiUrl) {

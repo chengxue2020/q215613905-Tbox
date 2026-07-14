@@ -24,6 +24,7 @@ public class RefreshEvent {
     public static final int TYPE_HOME_SOURCE_CHANGE = 15;
     public static final int TYPE_SET_DANMU_SETTINGS = 18;
     public static final int TYPE_DANMU_REFRESH = 19;
+    public static final int TYPE_PLAY_QUALITY = 20;
     public int type;
     public Object obj;
 

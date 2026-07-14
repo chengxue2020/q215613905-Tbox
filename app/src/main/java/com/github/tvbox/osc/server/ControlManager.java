@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.text.TextUtils;
 
 import com.github.tvbox.osc.event.RefreshEvent;
+import com.github.tvbox.osc.receiver.PushReceiver;
 import com.github.tvbox.osc.receiver.SearchReceiver;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.HistoryHelper;
@@ -102,7 +103,7 @@ public class ControlManager {
 
                 @Override
                 public void onPushReceived(String url) {
-                    EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_PUSH_URL, url));
+                    PushReceiver.send(mContext, url);
                 }
             });
             try {

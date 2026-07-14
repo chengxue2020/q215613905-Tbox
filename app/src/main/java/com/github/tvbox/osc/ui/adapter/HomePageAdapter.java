@@ -19,6 +19,7 @@ import java.util.List;
 public class HomePageAdapter extends FragmentPagerAdapter {
     public FragmentManager fragmentManager;
     public List<BaseLazyFragment> list;
+    private final long adapterId = System.nanoTime();
 
     public HomePageAdapter(FragmentManager fm) {
         super(fm);
@@ -55,6 +56,11 @@ public class HomePageAdapter extends FragmentPagerAdapter {
     }
 
     @Override
+    public long getItemId(int position) {
+        return adapterId + position;
+    }
+
+    @Override
     public int getCount() {
         return list != null ? list.size() : 0;
     }
@@ -69,7 +75,7 @@ public class HomePageAdapter extends FragmentPagerAdapter {
     @Override
     public void destroyItem(ViewGroup container, int position, Object object) {
         // super.destroyItem(container, position, object);
-        Fragment fragment = list.get(position);
+        Fragment fragment = (Fragment) object;
         fragmentManager.beginTransaction().hide(fragment).commitAllowingStateLoss();
     }
 }

@@ -3,6 +3,7 @@ package com.github.tvbox.osc.ui.activity;
 import android.annotation.SuppressLint;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Outline;
 import android.graphics.PointF;
@@ -63,6 +64,7 @@ import com.owen.tvrecyclerview.widget.V7LinearLayoutManager;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayInputStream;
@@ -114,6 +116,7 @@ public class DetailActivity extends BaseActivity {
     private TextView tvQuickSearch;
     private TextView tvCollect;
     private TvRecyclerView mGridViewFlag;
+    private TvRecyclerView mGridViewQuality;
     private TvRecyclerView mGridView;
     private TvRecyclerView mSeriesGroupView;
     private LinearLayout mEmptyPlayList;
@@ -122,6 +125,7 @@ public class DetailActivity extends BaseActivity {
     private Movie.Video mVideo;
     private VodInfo vodInfo;
     private SeriesFlagAdapter seriesFlagAdapter;
+    private BaseQuickAdapter<String, BaseViewHolder> qualityAdapter;
     private BaseQuickAdapter<String, BaseViewHolder> seriesGroupAdapter;
     private SeriesAdapter seriesAdapter;
     public String vodId;
@@ -135,8 +139,11 @@ public class DetailActivity extends BaseActivity {
     private V7GridLayoutManager mGridViewLayoutMgr = null;
     private HashMap<String, String> mCheckSources = null;
     private final ArrayList<String> seriesGroupOptions = new ArrayList<>();
+    private final ArrayList<String> qualityOptions = new ArrayList<>();
     private View currentSeriesGroupView;
+    private int selectedSeriesGroupPosition;
     private int GroupCount;
+    private int qualityPosition;
     boolean showPreview = Hawk.get(HawkConfig.SHOW_PREVIEW, true);; // true 开启 false 关闭
 
     private LinearSmoothScroller smoothScroller;
@@ -204,6 +211,41 @@ public class DetailActivity extends BaseActivity {
         mGridViewFlag.setLayoutManager(new V7LinearLayoutManager(this.mContext, 0, false));
         seriesFlagAdapter = new SeriesFlagAdapter();
         mGridViewFlag.setAdapter(seriesFlagAdapter);
+        mGridViewQuality = findViewById(R.id.mGridViewQuality);
+        mGridViewQuality.setHasFixedSize(true);
+        mGridViewQuality.setLayoutManager(new V7LinearLayoutManager(this.mContext, 0, false));
+        qualityAdapter = new BaseQuickAdapter<String, BaseViewHolder>(R.layout.item_series_flag, qualityOptions) {
+            @Override
+            protected void convert(BaseViewHolder helper, String item) {
+                helper.setText(R.id.tvSeriesFlag, item);
+                helper.getView(R.id.tvSeriesFlagSelect).setVisibility(helper.getLayoutPosition() == qualityPosition ? View.VISIBLE : View.GONE);
+                helper.itemView.setNextFocusUpId(tvSeriesGroup.getVisibility() == View.VISIBLE ? R.id.mSeriesSortTv : R.id.mGridViewFlag);
+                helper.itemView.setNextFocusDownId(R.id.mGridView);
+            }
+        };
+        mGridViewQuality.setAdapter(qualityAdapter);
+        mGridViewQuality.setOnItemListener(new TvRecyclerView.OnItemListener() {
+            @Override
+            public void onItemPreSelected(TvRecyclerView parent, View itemView, int position) {
+            }
+
+            @Override
+            public void onItemSelected(TvRecyclerView parent, View itemView, int position) {
+            }
+
+            @Override
+            public void onItemClick(TvRecyclerView parent, View itemView, int position) {
+                if (playFragment == null) return;
+                if (position == qualityPosition) {
+                    if (showPreview && !fullWindows && playFragment.getPlayer().isPlaying()) enterFullPreview();
+                    return;
+                }
+                if (playFragment.selectQuality(position)) {
+                    qualityPosition = position;
+                    qualityAdapter.notifyDataSetChanged();
+                }
+            }
+        });
         isReverse = false;
         firstReverse = false;
         preFlag = "";
@@ -217,11 +259,13 @@ public class DetailActivity extends BaseActivity {
         tvSeriesGroup = findViewById(R.id.mSeriesGroupTv);
         mSeriesGroupView.setHasFixedSize(true);
         mSeriesGroupView.setLayoutManager(new V7LinearLayoutManager(this.mContext, 0, false));
-        seriesGroupAdapter = new BaseQuickAdapter<String, BaseViewHolder>(R.layout.item_series_group, seriesGroupOptions) {
+        seriesGroupAdapter = new BaseQuickAdapter<String, BaseViewHolder>(R.layout.item_series_flag, seriesGroupOptions) {
             @Override
             protected void convert(BaseViewHolder helper, String item) {
-                TextView tvSeries = helper.getView(R.id.tvSeriesGroup);
+                TextView tvSeries = helper.getView(R.id.tvSeriesFlag);
                 tvSeries.setText(item);
+                helper.getView(R.id.tvSeriesFlagSelect).setVisibility(helper.getLayoutPosition() == selectedSeriesGroupPosition ? View.VISIBLE : View.GONE);
+                helper.itemView.setNextFocusUpId(R.id.mGridViewFlag);
                 if (helper.getLayoutPosition() == getData().size() - 1) {
                     helper.itemView.setId(View.generateViewId());
                     helper.itemView.setNextFocusRightId(helper.itemView.getId());
@@ -330,7 +374,7 @@ public class DetailActivity extends BaseActivity {
 
                     customSeriesScrollPos(vodInfo.playIndex);
                     if(currentSeriesGroupView != null) {
-                        TextView txtView = currentSeriesGroupView.findViewById(R.id.tvSeriesGroup);
+                        TextView txtView = currentSeriesGroupView.findViewById(R.id.tvSeriesFlag);
                         txtView.setTextColor(Color.WHITE);
                     }
                 }
@@ -382,12 +426,14 @@ public class DetailActivity extends BaseActivity {
                         VodInfo.VodSeriesFlag flag = vodInfo.seriesFlags.get(i);
                         if (flag.name.equals(oldFlag)) {
                             flag.selected = false;
-                            seriesFlagAdapter.notifyItemChanged(i);
+                            View oldItemView = mGridViewFlag.getLayoutManager().findViewByPosition(i);
+                            if (oldItemView != null) oldItemView.findViewById(R.id.tvSeriesFlagSelect).setVisibility(View.GONE);
                             break;
                         }
                     }
                     VodInfo.VodSeriesFlag flag = vodInfo.seriesFlags.get(position);
                     flag.selected = true;
+                    itemView.findViewById(R.id.tvSeriesFlagSelect).setVisibility(View.VISIBLE);
                     // clean pre flag select status
                     if (oldSeriesList != null && oldSeriesList.size() > oldIndex) {
                         oldSeriesList.get(oldIndex).selected = false;
@@ -401,9 +447,7 @@ public class DetailActivity extends BaseActivity {
                         }
                         newSeriesList.get(vodInfo.playIndex).selected = true;
                     }
-                    seriesFlagAdapter.notifyItemChanged(position);
                     refreshList();
-                    mGridView.clearFocus();
                 }
                 seriesFlagFocus = itemView;
             }
@@ -431,7 +475,6 @@ public class DetailActivity extends BaseActivity {
                 FastClickCheckUtil.check(view);
                 if (vodInfo != null && vodInfo.seriesMap.get(vodInfo.playFlag).size() > 0) {
                     boolean reload = false;
-                    boolean isAllowFull = false;
                     for (int j = 0; j < vodInfo.seriesMap.get(vodInfo.playFlag).size(); j++) {
                         seriesAdapter.getData().get(j).selected = false;
                         seriesAdapter.notifyItemChanged(j);
@@ -447,18 +490,16 @@ public class DetailActivity extends BaseActivity {
                     //解决当前集不刷新的BUG
                     if (!preFlag.isEmpty() && !vodInfo.playFlag.equals(preFlag)) {
                         reload = true;
-                        isAllowFull = true;
                     }
                     boolean isCurrentPlaying = !showPreview || isCurrentPreviewPlaying(position);
                     if (showPreview && !isCurrentPlaying) {
                         reload = true;
-                        isAllowFull = true;
                     }
 
                     seriesAdapter.getData().get(vodInfo.playIndex).selected = true;
                     seriesAdapter.notifyItemChanged(vodInfo.playIndex);
                     //选集全屏 想选集不全屏的注释下面一行
-                    if (showPreview && !fullWindows && isCurrentPlaying && !isAllowFull && playFragment.getPlayer().isPlaying()) enterFullPreview();
+                    if (showPreview && !fullWindows && previewVodInfo != null && TextUtils.equals(vodInfo.playFlag, previewVodInfo.playFlag) && playFragment.getPlayer().isPlaying()) enterFullPreview();
                     if (!showPreview || reload) {
                         jumpToPlay();
                         firstReverse=false;
@@ -470,15 +511,14 @@ public class DetailActivity extends BaseActivity {
         mSeriesGroupView.setOnItemListener(new TvRecyclerView.OnItemListener() {
             @Override
             public void onItemPreSelected(TvRecyclerView parent, View itemView, int position) {
-                TextView txtView = itemView.findViewById(R.id.tvSeriesGroup);
+                TextView txtView = itemView.findViewById(R.id.tvSeriesFlag);
                 txtView.setTextColor(Color.WHITE);
 //                currentSeriesGroupView = null;
             }
 
             @Override
             public void onItemSelected(TvRecyclerView parent, View itemView, int position) {
-                TextView txtView = itemView.findViewById(R.id.tvSeriesGroup);
-                txtView.setTextColor(mContext.getResources().getColor(R.color.color_02F8E1));
+                selectSeriesGroup(itemView, position);
                 if (vodInfo != null && vodInfo.seriesMap.get(vodInfo.playFlag).size() > 0) {
                     int targetPos = position * GroupCount;
 //                    mGridView.smoothScrollToPosition(targetPos);
@@ -493,7 +533,6 @@ public class DetailActivity extends BaseActivity {
         });
         tvSeriesSort.setOnFocusChangeListener((view, hasFocus) -> {
             if (hasFocus) {
-                tvSeriesSort.setTextColor(mContext.getResources().getColor(R.color.color_02F8E1));
                 if (vodInfo != null && Objects.requireNonNull(vodInfo.seriesMap.get(vodInfo.playFlag)).size() > 0) {
                     int firstVisible = mGridView.getFirstVisiblePosition();
                     int lastVisible = mGridView.getLastVisiblePosition();
@@ -509,15 +548,14 @@ public class DetailActivity extends BaseActivity {
             @Override
             public void onItemClick(BaseQuickAdapter adapter, View view, int position) {
                 FastClickCheckUtil.check(view);
-                TextView newTxtView = view.findViewById(R.id.tvSeriesGroup);
-                newTxtView.setTextColor(mContext.getResources().getColor(R.color.color_02F8E1));
+                selectSeriesGroup(view, position);
                 if (vodInfo != null && vodInfo.seriesMap.get(vodInfo.playFlag).size() > 0) {
                     int targetPos =  position * GroupCount+1;
 
                     customSeriesScrollPos(targetPos);
                 }
                 if(currentSeriesGroupView != null) {
-                    TextView txtView = currentSeriesGroupView.findViewById(R.id.tvSeriesGroup);
+                    TextView txtView = currentSeriesGroupView.findViewById(R.id.tvSeriesFlag);
                     txtView.setTextColor(Color.WHITE);
                 }
                 currentSeriesGroupView = view;
@@ -534,6 +572,14 @@ public class DetailActivity extends BaseActivity {
     }
 
     //解决类似海贼王的超长动漫 焦点滚动失败的问题
+    private void selectSeriesGroup(View selectedView, int position) {
+        if (selectedSeriesGroupPosition == position) return;
+        View previousView = mSeriesGroupView.getLayoutManager().findViewByPosition(selectedSeriesGroupPosition);
+        if (previousView != null) previousView.findViewById(R.id.tvSeriesFlagSelect).setVisibility(View.GONE);
+        selectedSeriesGroupPosition = position;
+        selectedView.findViewById(R.id.tvSeriesFlagSelect).setVisibility(View.VISIBLE);
+    }
+
     void customSeriesScrollPos(int targetPos)
     {
         mGridViewLayoutMgr.scrollToPositionWithOffset(targetPos>10?targetPos - 10:0, 0);
@@ -674,10 +720,43 @@ public class DetailActivity extends BaseActivity {
             }
 //            if(vodInfo.reverseSort) Collections.reverse(seriesGroupOptions);
 
+            selectedSeriesGroupPosition = Math.max(0, Math.min(vodInfo.playIndex / GroupCount, seriesGroupOptions.size() - 1));
             seriesGroupAdapter.notifyDataSetChanged();
         }else {
             tvSeriesGroup.setVisibility(View.GONE);
         }
+        if (!mGridViewFlag.hasFocus()) seriesFlagAdapter.notifyDataSetChanged();
+        mGridViewQuality.setNextFocusUpId(tvSeriesGroup.getVisibility() == View.VISIBLE ? R.id.mSeriesSortTv : R.id.mGridViewFlag);
+    }
+
+    private void updateQualityOptions(JSONObject result) {
+        ArrayList<String> options = new ArrayList<>();
+        try {
+            Object value = result == null ? null : result.opt("url");
+            JSONArray urls = value instanceof JSONArray ? (JSONArray) value : value instanceof String ? new JSONArray((String) value) : null;
+            if (urls != null) for (int i = 0; i + 1 < urls.length(); i += 2) options.add(urls.optString(i));
+        } catch (Throwable th) {
+        }
+        if (qualityOptions.equals(options)) {
+            if (qualityPosition == 0) return;
+            qualityPosition = 0;
+            qualityAdapter.notifyDataSetChanged();
+            return;
+        }
+        qualityOptions.clear();
+        qualityOptions.addAll(options);
+        qualityPosition = 0;
+        boolean visible = showPreview && options.size() > 1;
+        mGridViewQuality.setVisibility(visible ? View.VISIBLE : View.GONE);
+        seriesFlagAdapter.notifyDataSetChanged();
+        seriesAdapter.notifyDataSetChanged();
+        qualityAdapter.setNewData(new ArrayList<>(qualityOptions));
+        int up = tvSeriesGroup.getVisibility() == View.VISIBLE ? R.id.mSeriesSortTv : R.id.mGridViewFlag;
+        int down = visible ? R.id.mGridViewQuality : R.id.mGridView;
+        mGridViewQuality.setNextFocusUpId(up);
+        mGridViewQuality.setNextFocusDownId(R.id.mGridView);
+        tvSeriesSort.setNextFocusDownId(down);
+        mSeriesGroupView.setNextFocusDownId(down);
     }
 
     private void setTextShow(TextView view, String tag, String info) {
@@ -904,6 +983,8 @@ public class DetailActivity extends BaseActivity {
                 }
 
             }
+        } else if (event.type == RefreshEvent.TYPE_PLAY_QUALITY) {
+            updateQualityOptions(event.obj instanceof JSONObject ? (JSONObject) event.obj : null);
         } else if (event.type == RefreshEvent.TYPE_QUICK_SEARCH_SELECT) {
             if (event.obj != null) {
                 Movie.Video video = (Movie.Video) event.obj;
@@ -1045,6 +1126,9 @@ public class DetailActivity extends BaseActivity {
             return;
         }
 
+        String oldFlag = vodInfo.playFlag;
+        int oldIndex = vodInfo.playIndex;
+        boolean sameFlag = TextUtils.equals(oldFlag, newFlag);
         VodInfo.VodSeries playingSeries = getPlayingSeries(playingVodInfo, newFlag);
         int newIndex = findSameEpisodeIndex(playingSeries, newSeriesList, playingVodInfo.playIndex);
         vodInfo.playFlag = newFlag;
@@ -1067,7 +1151,14 @@ public class DetailActivity extends BaseActivity {
         newSeriesList.get(newIndex).selected = true;
 
         seriesFlagAdapter.notifyDataSetChanged();
-        refreshList();
+        if (sameFlag && oldIndex >= 0 && oldIndex < newSeriesList.size()) {
+            if (oldIndex != newIndex) {
+                seriesAdapter.notifyItemChanged(oldIndex);
+                seriesAdapter.notifyItemChanged(newIndex);
+            }
+        } else {
+            refreshList();
+        }
         setTvPlayUrl(newSeriesList.get(newIndex).url);
 
         int flagIndex = -1;
@@ -1083,7 +1174,7 @@ public class DetailActivity extends BaseActivity {
                 mGridViewFlag.setSelection(flagIndex);
             }
         }
-        if (!isFirstLoad && mGridView.hasFocus()) {
+        if (!isFirstLoad) {
             mGridView.setSelection(newIndex);
         }
 
@@ -1214,18 +1305,6 @@ public class DetailActivity extends BaseActivity {
             exitFullPreview();
             return;
         }
-        if (seriesSelect) {
-            if (seriesFlagFocus != null && !seriesFlagFocus.isFocused()) {
-                try {
-                    if (seriesFlagFocus.isShown()) {
-                        seriesFlagFocus.requestFocus();
-                        return;
-                    }
-                } catch (Throwable th) {
-                    th.printStackTrace();
-                }
-            }
-        }
         if(showPreview && playFragment!=null){
             try {
                 playFragment.setPlayTitle(false);
@@ -1270,6 +1349,8 @@ public class DetailActivity extends BaseActivity {
     // preview
     VodInfo previewVodInfo = null;
     boolean fullWindows = false;
+    private int previewOrientation;
+    private boolean previewOrientationChanged;
     ViewGroup.LayoutParams windowsPreview = null;
     ViewGroup.LayoutParams windowsFull = null;
 
@@ -1282,7 +1363,23 @@ public class DetailActivity extends BaseActivity {
     }
 
     void exitFullPreview() {
+        boolean needRefreshSeries = previewOrientationChanged;
         setFullPreview(false);
+        previewOrientationChanged = false;
+        if (needRefreshSeries) refreshSeriesAfterFullPreview();
+    }
+
+    private void refreshSeriesAfterFullPreview() {
+        if (seriesAdapter == null || vodInfo == null || vodInfo.seriesMap == null || TextUtils.isEmpty(vodInfo.playFlag)) return;
+        if (vodInfo.seriesMap.get(vodInfo.playFlag) == null) return;
+        mGridView.post(new Runnable() {
+            @Override
+            public void run() {
+                mGridView.getRecycledViewPool().clear();
+                mGridView.setAdapter(seriesAdapter);
+                refreshList();
+            }
+        });
     }
 
     void setFullPreview(boolean full) {
@@ -1291,6 +1388,10 @@ public class DetailActivity extends BaseActivity {
         }
         if (windowsFull == null) {
             windowsFull = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        }
+        if (full) {
+            previewOrientation = getResources().getConfiguration().orientation;
+            previewOrientationChanged = false;
         }
         fullWindows = full;
         if (playFragment != null) {
@@ -1308,6 +1409,7 @@ public class DetailActivity extends BaseActivity {
         } else {
             List<VodInfo.VodSeries> list = vodInfo == null || vodInfo.seriesMap == null || TextUtils.isEmpty(vodInfo.playFlag) ? null : vodInfo.seriesMap.get(vodInfo.playFlag);
             tvSeriesGroup.setVisibility(list != null && list.size() > 1 ? View.VISIBLE : View.GONE);
+            seriesFlagAdapter.notifyDataSetChanged();
             if (showPreview) mGridView.requestFocus();
             else {
                 if (playFragment != null) playFragment.pauseForHidden();
@@ -1315,6 +1417,15 @@ public class DetailActivity extends BaseActivity {
             }
         }
         toggleSubtitleTextSize();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        if (fullWindows && newConfig.orientation != previewOrientation) {
+            previewOrientation = newConfig.orientation;
+            previewOrientationChanged = true;
+        }
     }
 
     void ensurePlayFragment() {

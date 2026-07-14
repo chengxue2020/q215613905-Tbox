@@ -1,4 +1,4 @@
-package com.github.tvbox.osc.util.js;
+package com.github.catvod.crawler.js;
 
 import android.text.TextUtils;
 import android.util.Base64;

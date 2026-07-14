@@ -186,6 +186,7 @@
                 android:orientation="horizontal">
 
             <TextView
+                android:id="@+id/play_label"
                 android:singleLine="true"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -364,6 +365,20 @@
                 android:textSize="@dimen/ts_20" />
 
             <TextView
+                android:id="@+id/play_cast"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/vs_5"
+                android:layout_marginRight="@dimen/vs_5"
+                android:background="@drawable/button_dialog_main"
+                android:focusable="true"
+                android:padding="@dimen/vs_10"
+                android:visibility="visible"
+                android:text="投屏"
+                android:textColor="@android:color/white"
+                android:textSize="@dimen/ts_20"/>
+
+            <TextView
                 android:id="@+id/zimu_select"
                 android:singleLine="true"
                 android:layout_width="wrap_content"
@@ -414,7 +429,7 @@
                 android:background="@drawable/button_dialog_main"
                 android:focusable="true"
                 android:padding="@dimen/vs_10"
-                android:text="弹幕搜索"
+                android:text="搜弹幕"
                 android:textColor="@android:color/white"
                 android:textSize="@dimen/ts_20"
                 android:visibility="gone"/>
@@ -432,6 +447,7 @@
                 android:text="横竖屏"
                 android:textColor="@android:color/white"
                 android:textSize="@dimen/ts_20"/>
+
             <TextView
                 android:id="@+id/screen_display"
                 android:layout_width="wrap_content"
@@ -509,18 +525,21 @@
             <SeekBar
                 android:id="@+id/seekBar"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="@dimen/vs_30"
                 android:layout_weight="16"
                 android:layout_gravity="center_vertical"
                 android:max="1000"
                 android:progressDrawable="@drawable/shape_player_control_vod_seek"
                 android:thumb="@drawable/shape_player_control_vod_seek_thumb"
+                android:thumbOffset="8dp"
                 android:background="@null"
                 android:maxHeight="@dimen/vs_6"
                 android:minHeight="@dimen/vs_6"
-                android:paddingVertical="@dimen/vs_2"
-                android:focusable="false"
-                android:focusableInTouchMode="false" />
+                android:splitTrack="false"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:nextFocusLeft="@id/seekBar"
+                android:nextFocusRight="@id/seekBar" />
 
             <TextView
                 android:id="@+id/total_time"

@@ -9,6 +9,10 @@ buildscript {
         maven { url "https://maven.aliyun.com/repository/releases" }
         maven { url "https://storage.googleapis.com/r8-releases/raw" }
         maven { url "https://chaquo.com/maven" }
+        maven {
+            url "http://4thline.org/m2"
+            allowInsecureProtocol = true
+        }
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:7.2.2'
@@ -27,6 +31,10 @@ allprojects {
         maven { url "https://maven.aliyun.com/repository/public" }
         maven { url "https://maven.aliyun.com/repository/releases" }
         gradlePluginPortal()
+        maven {
+            url "http://4thline.org/m2"
+            allowInsecureProtocol = true
+        }
     }
 }
 

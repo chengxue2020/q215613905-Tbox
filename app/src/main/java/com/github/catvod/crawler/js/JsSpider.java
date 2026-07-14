@@ -1,4 +1,4 @@
-package com.github.tvbox.osc.util.js;
+package com.github.catvod.crawler.js;
 
 import android.content.Context;
 import android.text.TextUtils;
@@ -8,10 +8,12 @@ import com.github.tvbox.osc.util.FileUtils;
 import com.github.tvbox.osc.util.LOG;
 import com.github.tvbox.osc.util.MD5;
 
+import com.whl.quickjs.wrapper.ContextSetter;
 import com.whl.quickjs.wrapper.Function;
 import com.whl.quickjs.wrapper.JSArray;
 
 import com.whl.quickjs.wrapper.JSCallFunction;
+import com.whl.quickjs.wrapper.JSMethod;
 import com.whl.quickjs.wrapper.JSObject;
 import com.whl.quickjs.wrapper.JSUtils;
 import com.whl.quickjs.wrapper.QuickJSContext;
@@ -38,6 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class JsSpider extends Spider {
 
+    private static final byte BYTECODE_VERSION = 67;
     private static final String EMPTY_MODULE_CODE =
             "const empty = null;\n" +
             "export default empty;\n" +
@@ -76,6 +79,61 @@ public class JsSpider extends Spider {
         Connect.cancelByTag("js_okhttp_tag");
     }
 
+    private JSObject createObject() {
+        return ctx.createNewJSObject();
+    }
+
+    private JSArray createArray() {
+        return ctx.createNewJSArray();
+    }
+
+    private void set(JSObject object, String name, Object value) {
+        ctx.setProperty(object, name, value);
+    }
+
+    private Object get(JSObject object, String name) {
+        return ctx.getProperty(object, name);
+    }
+
+    private JSONArray toJsonArray(JSArray array) {
+        return JSUtils.toJsonArray(array);
+    }
+
+    private void bind(JSObject target, Object receiver) {
+        for (Method method : receiver.getClass().getMethods()) {
+            if (method.isAnnotationPresent(ContextSetter.class)) {
+                try {
+                    method.invoke(receiver, ctx);
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        for (Method method : receiver.getClass().getMethods()) {
+            if (!isQuickJsMethod(method)) continue;
+            String name = methodName(method);
+            set(target, name, new JSCallFunction() {
+                @Override
+                public Object call(Object... args) {
+                    try {
+                        return method.invoke(receiver, args);
+                    } catch (Throwable ignored) {
+                        return null;
+                    }
+                }
+            });
+        }
+    }
+
+    private boolean isQuickJsMethod(Method method) {
+        return method.isAnnotationPresent(Function.class) || method.isAnnotationPresent(JSMethod.class);
+    }
+
+    private String methodName(Method method) {
+        Function function = method.getAnnotation(Function.class);
+        if (function != null && !TextUtils.isEmpty(function.name())) return function.name();
+        return method.getName();
+    }
+
     private void submit(Runnable runnable) {
         if (!destroyed.get()) executor.submit(runnable);
     }
@@ -96,11 +154,11 @@ public class JsSpider extends Spider {
     }
 
     private JSObject cfg(String ext) {
-        JSObject cfg = ctx.createJSObject();
-        cfg.set("stype", 3);
-        cfg.set("skey", key);
-        if (Json.invalid(ext)) cfg.set("ext", ext);
-        else cfg.set("ext", (JSObject) ctx.parse(ext));
+        JSObject cfg = createObject();
+        set(cfg, "stype", 3);
+        set(cfg, "skey", TextUtils.isEmpty(siteKey) ? key : siteKey);
+        if (Json.invalid(ext)) set(cfg, "ext", ext);
+        else set(cfg, "ext", (JSObject) ctx.parse(ext));
         return cfg;
     }
 
@@ -258,8 +316,13 @@ public class JsSpider extends Spider {
             if(content.startsWith("//bb")){
                 cat = true;
                 byte[] b = Base64.decode(content.replace("//bb",""), 0);
-                ctx.execute(byteFF(b), key + ".js");
-                ctx.evaluateModule(String.format(SPIDER_STRING_CODE, key + ".js") + "globalThis." + key + " = globalThis.__JS_SPIDER__;", "tv_box_root.js");
+                try {
+                    ctx.execute(byteFF(b));
+                    ctx.evaluateModule(String.format(SPIDER_STRING_CODE, key + ".js") + "globalThis." + key + " = globalThis.__JS_SPIDER__;", "tv_box_root.js");
+                } catch (Throwable th) {
+                    LOG.i("echo-bytecode-execute-error " + api + ", msg=" + th.getMessage());
+                    return null;
+                }
                 //ctx.execute(byteFF(b), key + ".js","__jsEvalReturn");
                 //ctx.evaluate("globalThis." + key + " = __JS_SPIDER__;");
             } else {
@@ -271,12 +334,17 @@ public class JsSpider extends Spider {
                     moduleExtName = "__jsEvalReturn";
                     cat = true;
                 }
-                ctx.evaluateModule(content, api);
-                ctx.evaluateModule(String.format(SPIDER_STRING_CODE, api) + "globalThis." + key + " = globalThis.__JS_SPIDER__;", "tv_box_root.js");
+                try {
+                    ctx.evaluateModule(content, api);
+                    ctx.evaluateModule(String.format(SPIDER_STRING_CODE, api) + "globalThis." + key + " = globalThis.__JS_SPIDER__;", "tv_box_root.js");
+                } catch (Throwable th) {
+                    LOG.i("echo-evaluateModule-error " + api + ", msg=" + th.getMessage());
+                    return null;
+                }
                 //ctx.evaluateModule(content, api, moduleExtName);
                 //ctx.evaluate("globalThis." + key + " = __JS_SPIDER__;");                
             }
-            jsObject = (JSObject) ctx.get(ctx.getGlobalObject(), key);
+            jsObject = (JSObject) get(ctx.getGlobalObject(), key);
             if (jsObject != null) jsObject.hold();
             return null;
         }).get();
@@ -284,7 +352,7 @@ public class JsSpider extends Spider {
 
     public static byte[] byteFF(byte[] bytes) {
         byte[] newBt = new byte[bytes.length - 4];
-        newBt[0] = 1;
+        newBt[0] = BYTECODE_VERSION;
         System.arraycopy(bytes, 5, newBt, 1, bytes.length - 5);
         return newBt;
     }
@@ -300,10 +368,21 @@ public class JsSpider extends Spider {
                     return compileEmptyModule(moduleName);
                 }
                 if(ss.startsWith("//DRPY")){
-                    return Base64.decode(ss.replace("//DRPY",""), Base64.URL_SAFE);
+                    try {
+                        byte[] bytes = bytecode(Base64.decode(ss.replace("//DRPY",""), Base64.URL_SAFE));
+                        return bytes == null ? compileEmptyModule(moduleName) : bytes;
+                    } catch (Throwable th) {
+                        LOG.i("echo-bytecode-module-error " + moduleName + ", msg=" + th.getMessage());
+                        return compileEmptyModule(moduleName);
+                    }
                 } else if(ss.startsWith("//bb")){
-                    byte[] b = Base64.decode(ss.replace("//bb",""), 0);
-                    return byteFF(b);
+                    try {
+                        byte[] b = Base64.decode(ss.replace("//bb",""), 0);
+                        return byteFF(b);
+                    } catch (Throwable th) {
+                        LOG.i("echo-bytecode-module-error " + moduleName + ", msg=" + th.getMessage());
+                        return compileEmptyModule(moduleName);
+                    }
                 } else {
                     return compileModule(moduleName, ss);
                 }
@@ -317,15 +396,27 @@ public class JsSpider extends Spider {
         ctx.setConsole(new QuickJSContext.Console() {
             @Override
             public void log(String s) {
-                LOG.i("QuJs"+s);
+                LOG.i("echo-QuJs " + s);
+            }
+            @Override
+            public void info(String s) {
+                LOG.i("echo-QuJs " + s);
+            }
+            @Override
+            public void warn(String s) {
+                LOG.i("echo-QuJs " + s);
+            }
+            @Override
+            public void error(String s) {
+                LOG.i("echo-QuJs " + s);
             }
         });
 
-        ctx.getGlobalObject().bind(new Global(executor));
+        bind(ctx.getGlobalObject(), new Global(executor));
 
-        JSObject local = ctx.createJSObject();
-        ctx.getGlobalObject().set("local", local);
-        local.bind(new local());
+        JSObject local = createObject();
+        set(ctx.getGlobalObject(), "local", local);
+        bind(local, new local());
 
         String net = FileUtils.loadModule("net.js");
         if (!isInvalidModuleContent(net)) ctx.getGlobalObject().getContext().evaluate(net);
@@ -335,6 +426,13 @@ public class JsSpider extends Spider {
     private byte[] compileEmptyModule(String moduleName) {
         LOG.i("echo-getModuleBytecode empty :" + moduleName);
         return emptyModuleBytecode;
+    }
+
+    private static byte[] bytecode(byte[] bytes) {
+        if (bytes == null || bytes.length == 0) return null;
+        if (bytes[0] == BYTECODE_VERSION) return bytes;
+        LOG.i("echo-bytecode-version-mismatch actual=" + bytes[0] + ", expected=" + BYTECODE_VERSION);
+        return null;
     }
 
     private byte[] compileModule(String moduleName, String content) {
@@ -379,10 +477,10 @@ public class JsSpider extends Spider {
 
     private void createDex() {
         try {
-            JSObject obj = ctx.createJSObject();
+            JSObject obj = createObject();
             Class<?> clz = dex;
             Class<?>[] classes = clz.getDeclaredClasses();
-            ctx.getGlobalObject().set("jsapi", obj);
+            set(ctx.getGlobalObject(), "jsapi", obj);
             if (classes.length == 0) invokeSingle(clz, obj);
             if (classes.length >= 1) invokeMultiple(clz, obj);
         } catch (Throwable e) {
@@ -397,21 +495,21 @@ public class JsSpider extends Spider {
     private void invokeMultiple(Class<?> clz, JSObject jsObj) throws Throwable {
         for (Class<?> subClz : clz.getDeclaredClasses()) {
             Object javaObj = subClz.getDeclaredConstructor(clz).newInstance(clz.getDeclaredConstructor(QuickJSContext.class).newInstance(ctx));
-            JSObject subObj = ctx.createJSObject();
+            JSObject subObj = createObject();
             invoke(subClz, subObj, javaObj);
-            jsObj.set(subClz.getSimpleName(), subObj);
+            set(jsObj, subClz.getSimpleName(), subObj);
         }
     }
 
     private void invoke(Class<?> clz, JSObject jsObj, Object javaObj) {
         for (Method method : clz.getMethods()) {
-            if (!method.isAnnotationPresent(Function.class)) continue;
+            if (!isQuickJsMethod(method)) continue;
             invoke(jsObj, method, javaObj);
         }
     }
 
     private void invoke(JSObject jsObj, Method method, Object javaObj) {
-        jsObj.set(method.getName(), new JSCallFunction() {
+        set(jsObj, methodName(method), new JSCallFunction() {
             @Override
             public Object call(Object... objects) {
                 try {
@@ -439,7 +537,7 @@ public class JsSpider extends Spider {
 
     private Object[] proxy1(Map<String, String> params) {
         JSObject object = new JSUtils<String>().toObj(ctx, params);
-        JSONArray array = ((JSArray) jsObject.getJSFunction("proxy").call(object)).toJsonArray();
+        JSONArray array = toJsonArray((JSArray) jsObject.getJSFunction("proxy").call(object));
         boolean headerAvailable = array.length() > 3 && array.opt(3) != null;
         Object[] result = new Object[4];
         result[0] = array.opt(0);

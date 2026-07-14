@@ -21,6 +21,10 @@ import master.flame.danmaku.ui.widget.DanmakuView;
 import xyz.doikki.videoplayer.player.VideoView;
 
 public class DanmuLoadController {
+    public interface LoadCallback {
+        void onFailed();
+    }
+
     private final MyVideoView videoView;
     private final VodController controller;
     private final DanmakuView danmuView;
@@ -32,6 +36,7 @@ public class DanmuLoadController {
     private String danmuEpisode = "";
     private int startedSeq = -1;
     private boolean pendingPrepare;
+    private LoadCallback loadCallback;
 
     public DanmuLoadController(MyVideoView videoView, VodController controller, DanmakuView danmuView) {
         this.videoView = videoView;
@@ -73,6 +78,11 @@ public class DanmuLoadController {
     }
 
     public void check(String danmu, String title, String episode) {
+        check(danmu, title, episode, null);
+    }
+
+    public void check(String danmu, String title, String episode, LoadCallback callback) {
+        loadCallback = callback;
         danmuText = TextUtils.isEmpty(danmu) ? "" : danmu.trim();
         danmuTitle = TextUtils.isEmpty(title) ? "" : title;
         danmuEpisode = TextUtils.isEmpty(episode) ? "" : episode;
@@ -106,6 +116,7 @@ public class DanmuLoadController {
         danmuTitle = "";
         danmuEpisode = "";
         pendingPrepare = false;
+        loadCallback = null;
         loadSeq.incrementAndGet();
         startedSeq = -1;
         if (controller != null) controller.setHasDanmu(false);
@@ -143,9 +154,11 @@ public class DanmuLoadController {
                     if (danmuCount <= 0) {
                         LOG.e("echo-danmu empty after parse");
                         danmuView.setVisibility(View.GONE);
+                        notifyLoadFailed(seq);
                         return;
                     }
                     danmuView.prepare(parser, danmakuContext);
+                    clearLoadCallback(seq);
                     danmuView.setVisibility(DanmuHelper.isOpen() ? View.VISIBLE : View.GONE);
                     startIfReady(seq);
                     danmuView.postDelayed(() -> startIfReady(seq), 300);
@@ -153,9 +166,21 @@ public class DanmuLoadController {
                 } catch (Throwable th) {
                     LOG.e("echo-danmu prepare error: " + th.getMessage());
                     danmuView.setVisibility(View.GONE);
+                    notifyLoadFailed(seq);
                 }
             });
         });
+    }
+
+    private void clearLoadCallback(int seq) {
+        if (seq == loadSeq.get()) loadCallback = null;
+    }
+
+    private void notifyLoadFailed(int seq) {
+        if (seq != loadSeq.get() || loadCallback == null) return;
+        LoadCallback callback = loadCallback;
+        loadCallback = null;
+        callback.onFailed();
     }
 
     private void startIfReady(int seq) {

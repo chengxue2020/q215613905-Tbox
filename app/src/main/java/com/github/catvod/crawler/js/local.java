@@ -1,4 +1,4 @@
-package com.github.tvbox.osc.util.js;
+package com.github.catvod.crawler.js;
 
 import androidx.annotation.Keep;
 import com.orhanobut.hawk.Hawk;

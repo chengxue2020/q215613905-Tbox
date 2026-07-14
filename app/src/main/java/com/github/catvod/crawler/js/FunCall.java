@@ -1,4 +1,4 @@
-package com.github.tvbox.osc.util.js;
+package com.github.catvod.crawler.js;
 
 import com.whl.quickjs.wrapper.JSCallFunction;
 import com.whl.quickjs.wrapper.JSFunction;

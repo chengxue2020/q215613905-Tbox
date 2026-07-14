@@ -5,6 +5,10 @@ plugins {
 android {
     compileSdkVersion 33
 
+    buildFeatures {
+        buildConfig false
+    }
+
     defaultConfig {
         minSdkVersion 19
         targetSdkVersion 28
@@ -40,7 +44,28 @@ android {
             version "3.10.2"
         }*/
     }
+
+    sourceSets {
+        main {
+            jniLibs.srcDirs = []
+            java {
+                exclude 'com/whl/quickjs/android/**'
+                exclude 'com/whl/quickjs/wrapper/BindingContext.java'
+                exclude 'com/whl/quickjs/wrapper/JSArray.java'
+                exclude 'com/whl/quickjs/wrapper/JSCallFunction.java'
+                exclude 'com/whl/quickjs/wrapper/JSConsole.java'
+                exclude 'com/whl/quickjs/wrapper/JSFunction.java'
+                exclude 'com/whl/quickjs/wrapper/JSObject.java'
+                exclude 'com/whl/quickjs/wrapper/ModuleLoader.java'
+                exclude 'com/whl/quickjs/wrapper/NativeCleaner.java'
+                exclude 'com/whl/quickjs/wrapper/QuickJSContext.java'
+                exclude 'com/whl/quickjs/wrapper/QuickJSException.java'
+            }
+        }
+    }
 }
 
 dependencies {
+    api 'wang.harlon.quickjs:wrapper-android:2.1.0'
+    api 'wang.harlon.quickjs:wrapper-java:2.1.0'
 }

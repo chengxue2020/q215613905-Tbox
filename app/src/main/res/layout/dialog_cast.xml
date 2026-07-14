@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="@dimen/vs_520"
+    android:layout_height="wrap_content"
+    android:background="@drawable/shape_danmu_setting_bg"
+    android:orientation="vertical"
+    android:paddingLeft="@dimen/vs_30"
+    android:paddingTop="@dimen/vs_24"
+    android:paddingRight="@dimen/vs_30"
+    android:paddingBottom="@dimen/vs_24">
+
+    <TextView
+        android:id="@+id/title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:shadowColor="@color/color_000000_60"
+        android:shadowDx="0"
+        android:shadowDy="0"
+        android:shadowRadius="5"
+        android:text="投屏到设备"
+        android:textColor="@color/dialog_text_primary"
+        android:textSize="@dimen/ts_26"
+        android:textStyle="bold" />
+
+     <TextView
+        android:id="@+id/tvCastTip"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/vs_15"
+        android:gravity="center"
+        android:lineSpacingExtra="@dimen/vs_4"
+        android:text="确认电视/盒子已安装TVBox或已打开DLNA投屏\n电视/盒子与手机连接在同一Wi-Fi下"
+        android:textColor="@color/dialog_text_hint"
+        android:textSize="@dimen/ts_18" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/vs_200"
+        android:layout_marginTop="@dimen/vs_20">
+
+        <com.owen.tvrecyclerview.widget.TvRecyclerView
+            android:id="@+id/list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:scrollbars="vertical"
+            app:tv_layoutManager="V7LinearLayoutManager"
+            app:tv_selectedItemIsCentered="true"
+            app:tv_verticalSpacingWithMargins="@dimen/vs_10" />
+
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="@dimen/vs_40"
+            android:layout_height="@dimen/vs_40"
+            android:layout_gravity="center"
+            android:indeterminateDrawable="@drawable/anim_loading" />
+
+        <TextView
+            android:id="@+id/tvScanning"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="@dimen/vs_60"
+            android:text="正在搜索设备..."
+            android:textColor="@color/dialog_text_hint"
+            android:textSize="@dimen/ts_20" />
+
+        <TextView
+            android:id="@+id/tvEmpty"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="未找到可用设备"
+            android:textColor="@color/dialog_text_hint"
+            android:textSize="@dimen/ts_20"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/vs_20"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/btnRefresh"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/vs_50"
+            android:layout_marginRight="@dimen/vs_10"
+            android:layout_weight="1"
+            android:background="@drawable/button_dialog_main"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="刷新"
+            android:textColor="@color/dialog_text_primary"
+            android:textSize="@dimen/ts_20"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btnCancel"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/vs_50"
+            android:layout_marginLeft="@dimen/vs_10"
+            android:layout_weight="1"
+            android:background="@drawable/button_dialog_main"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="取消"
+            android:textColor="@color/dialog_text_primary"
+            android:textSize="@dimen/ts_20"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+</LinearLayout>

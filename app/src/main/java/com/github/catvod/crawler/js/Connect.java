@@ -1,4 +1,4 @@
-package com.github.tvbox.osc.util.js;
+package com.github.catvod.crawler.js;
 
 import android.util.Base64;
 
@@ -35,17 +35,18 @@ public class Connect {
 
     public static JSObject success(QuickJSContext ctx, Req req, Response res) {
         try {
-            JSObject jsObject = ctx.createJSObject();
-            JSObject jsHeader = ctx.createJSObject();
+            JSObject jsObject = ctx.createNewJSObject();
+            JSObject jsHeader = ctx.createNewJSObject();
             setHeader(ctx, res, jsHeader);
-            jsObject.set("headers", jsHeader);
-            if (req.getBuffer() == 0) jsObject.set("content", new String(res.body().bytes(), req.getCharset()));
+            ctx.setProperty(jsObject, "headers", jsHeader);
+            if (req.getBuffer() == 0) ctx.setProperty(jsObject, "content", new String(res.body().bytes(), req.getCharset()));
             if (req.getBuffer() == 1) {
-                JSArray array = ctx.createJSArray();
-                for (byte aByte : res.body().bytes()) array.push((int) aByte);
-                jsObject.set("content", array);
+                JSArray array = ctx.createNewJSArray();
+                byte[] bytes = res.body().bytes();
+                for (int i = 0; i < bytes.length; i++) array.set((int) bytes[i], i);
+                ctx.setProperty(jsObject, "content", array);
             }
-            if (req.getBuffer() == 2) jsObject.set("content", Base64.encodeToString(res.body().bytes(), Base64.DEFAULT | Base64.NO_WRAP));
+            if (req.getBuffer() == 2) ctx.setProperty(jsObject, "content", Base64.encodeToString(res.body().bytes(), Base64.DEFAULT | Base64.NO_WRAP));
             return jsObject;
         } catch (Exception e) {
             return error(ctx);
@@ -53,10 +54,10 @@ public class Connect {
     }
 
     public static JSObject error(QuickJSContext ctx) {
-        JSObject jsObject = ctx.createJSObject();
-        JSObject jsHeader = ctx.createJSObject();
-        jsObject.set("headers", jsHeader);
-        jsObject.set("content", "");
+        JSObject jsObject = ctx.createNewJSObject();
+        JSObject jsHeader = ctx.createNewJSObject();
+        ctx.setProperty(jsObject, "headers", jsHeader);
+        ctx.setProperty(jsObject, "content", "");
         return jsObject;
     }
 
@@ -99,8 +100,8 @@ public class Connect {
 
     private static void setHeader(QuickJSContext ctx, Response res, JSObject object) {
         for (Map.Entry<String, List<String>> entry : res.headers().toMultimap().entrySet()) {
-            if (entry.getValue().size() == 1) object.set(entry.getKey(), entry.getValue().get(0));
-            if (entry.getValue().size() >= 2) object.set(entry.getKey(), new JSUtils<String>().toArray(ctx, entry.getValue()));
+            if (entry.getValue().size() == 1) ctx.setProperty(object, entry.getKey(), entry.getValue().get(0));
+            if (entry.getValue().size() >= 2) ctx.setProperty(object, entry.getKey(), new JSUtils<String>().toArray(ctx, entry.getValue()));
         }
     }
     public static void cancelByTag(Object tag) {

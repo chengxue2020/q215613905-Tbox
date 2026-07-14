@@ -46,10 +46,15 @@ public class PythonSpider extends Spider {
     }
 
     public void init(Context context, String url) {
+        init(context, url, "");
+    }
+
+    public void init(Context context, String url, String extend) {
         app = PythonLoader.getInstance().pyApp;
         PyObject retValue = app.callAttr("downloadPlugin", cachePath, url);
         Uri uri = Uri.parse(url);
-        String extInfo = uri.getQueryParameter("extend");
+        String extInfo = extend;
+        if (extInfo == null || extInfo.length() == 0) extInfo = uri.getQueryParameter("extend");
         if (null == extInfo) extInfo = "";
         String path = retValue.toString();
         Log.i("PyLoader", "echo-init path: " +path);
@@ -81,7 +86,6 @@ public class PythonSpider extends Spider {
             }
             app.callAttr("init", pySpider, extInfo);
             loadSuccess = true;
-            Log.i("PyLoader", "echo-init extInfo: " +url+ extInfo);
             PyLog.d(name + ": 下載插件成功！");
         } else {
             PyToast.showCancelableToast(name + "下载插件失败");

@@ -54,5 +54,9 @@ public class SeriesAdapter extends BaseQuickAdapter<VodInfo.VodSeries, BaseViewH
 //                helper.itemView.setNextFocusDownId(R.id.tvPlay);
 //            }
         }
+        View mGridViewQuality = ((Activity) helper.itemView.getContext()).findViewById(R.id.mGridViewQuality);
+        if (mGridViewQuality != null && mGridViewQuality.getVisibility() == View.VISIBLE && helper.getLayoutPosition() < mGridLayoutManager.getSpanCount()) {
+            helper.itemView.setNextFocusUpId(R.id.mGridViewQuality);
+        }
     }
 }

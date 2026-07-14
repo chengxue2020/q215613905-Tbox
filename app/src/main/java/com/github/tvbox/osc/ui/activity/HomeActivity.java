@@ -11,6 +11,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -113,6 +114,12 @@ public class HomeActivity extends BaseActivity {
             SimpleDateFormat timeFormat = new SimpleDateFormat("yyyy/MM/dd  E  HH:mm", Locale.CHINA);
             tvDate.setText(timeFormat.format(date));
             mHandler.postDelayed(this, 1000);
+        }
+    };
+    private final Runnable refreshTopInfoTextSizeRunnable = new Runnable() {
+        @Override
+        public void run() {
+            refreshTopInfoTextSize();
         }
     };
 
@@ -654,6 +661,9 @@ public class HomeActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        refreshTopInfoTextSize();
+        mHandler.removeCallbacks(refreshTopInfoTextSizeRunnable);
+        mHandler.postDelayed(refreshTopInfoTextSizeRunnable, 350);
         mHandler.post(mRunnable);
     }
 
@@ -661,7 +671,16 @@ public class HomeActivity extends BaseActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        mHandler.removeCallbacks(refreshTopInfoTextSizeRunnable);
         mHandler.removeCallbacks(mRunnable);
+    }
+
+    private void refreshTopInfoTextSize() {
+        if (tvName == null || tvDate == null) {
+            return;
+        }
+        tvName.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(R.dimen.ts_30));
+        tvDate.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(R.dimen.ts_26));
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)

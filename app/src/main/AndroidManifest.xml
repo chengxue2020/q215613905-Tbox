@@ -74,11 +74,22 @@
             android:name=".ui.activity.LocalFileActivity"
             android:screenOrientation="sensorLandscape" />
 
+        <service
+            android:name=".dlna.DLNACastService"
+            android:exported="false" />
+
         <receiver
             android:name=".receiver.SearchReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.content.movie.search.Action" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".receiver.PushReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.content.movie.push.Action" />
             </intent-filter>
         </receiver>
         <receiver

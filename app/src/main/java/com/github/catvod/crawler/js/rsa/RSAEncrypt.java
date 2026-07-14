@@ -1,4 +1,4 @@
-package com.github.tvbox.osc.util.js.rsa;
+package com.github.catvod.crawler.js.rsa;
 
 import android.util.Log;
 

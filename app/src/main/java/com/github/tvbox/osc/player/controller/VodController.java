@@ -4,7 +4,14 @@ import android.app.Activity;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
+import android.content.res.Configuration;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorFilter;
+import android.graphics.Paint;
+import android.graphics.PixelFormat;
+import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Message;
@@ -77,6 +84,16 @@ import static xyz.doikki.videoplayer.util.PlayerUtils.seconds2Time;
 import static xyz.doikki.videoplayer.util.PlayerUtils.safeTimeMs;
 
 public class VodController extends BaseController {
+    private static final float PORTRAIT_EPISODE_SWIPE_DP = 80f;
+    private static final long PORTRAIT_EPISODE_TITLE_SHOW_MS = 3000L;
+    private boolean portraitEpisodeSwipeTriggered;
+    private final Runnable portraitEpisodeTitleRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!isBottomVisible()) mTopRoot1.setVisibility(GONE);
+        }
+    };
+
     public VodController(@NonNull @NotNull Context context) {
         super(context);
         mHandlerCallback = new HandlerCallback() {
@@ -103,7 +120,8 @@ public class VodController extends BaseController {
                             net_play_speed.setVisibility(GONE);
                         }
                         mPlayTitle.setVisibility(GONE);
-                        backBtn.setVisibility(ScreenUtils.isTv(context) ? INVISIBLE : VISIBLE);
+                        boolean isPortrait = getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT;
+                        backBtn.setVisibility(ScreenUtils.isTv(context) || isPortrait ? INVISIBLE : VISIBLE);
                         showLockView();
                         break;
                     }
@@ -140,10 +158,50 @@ public class VodController extends BaseController {
         };
     }
 
+    @Override
+    public boolean onDown(MotionEvent e) {
+        portraitEpisodeSwipeTriggered = false;
+        return super.onDown(e);
+    }
+
+    @Override
+    public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+        if (isPortraitEpisodeSwipe(e1, e2)) {
+            if (!portraitEpisodeSwipeTriggered && Math.abs(e2.getY() - e1.getY()) >= portraitEpisodeSwipeThreshold()) {
+                portraitEpisodeSwipeTriggered = true;
+                if (listener != null) {
+                    if (e2.getY() < e1.getY()) listener.playNext(false);
+                    else listener.playPre();
+                    showPortraitEpisodeTitle();
+                }
+            }
+            return true;
+        }
+        return super.onScroll(e1, e2, distanceX, distanceY);
+    }
+
+    private boolean isPortraitEpisodeSwipe(MotionEvent e1, MotionEvent e2) {
+        if (e1 == null || e2 == null || !canHandleGesture(e1)) return false;
+        if (getResources().getConfiguration().orientation != Configuration.ORIENTATION_PORTRAIT) return false;
+        return Math.abs(e2.getY() - e1.getY()) > Math.abs(e2.getX() - e1.getX());
+    }
+
+    private float portraitEpisodeSwipeThreshold() {
+        return getResources().getDisplayMetrics().density * PORTRAIT_EPISODE_SWIPE_DP;
+    }
+
+    private void showPortraitEpisodeTitle() {
+        if (isBottomVisible()) return;
+        mHandler.removeCallbacks(portraitEpisodeTitleRunnable);
+        mTopRoot1.setVisibility(VISIBLE);
+        mHandler.postDelayed(portraitEpisodeTitleRunnable, PORTRAIT_EPISODE_TITLE_SHOW_MS);
+    }
+
     SeekBar mSeekBar;
     TextView mCurrentTime;
     TextView mTotalTime;
     boolean mIsDragging;
+    private boolean mSeekBarKeyTracking;
     LinearLayout mProgressRoot;
     TextView mProgressText;
     ImageView mProgressIcon;
@@ -156,6 +214,7 @@ public class VodController extends BaseController {
     TvRecyclerView mGridParseView;
     TextView mPlayTitle;
     TextView mPlayTitle1;
+    TextView mPlayLabel;
     TextView mPlayLoadNetSpeedRightTop;
     TextView mNextBtn;
     TextView mPreBtn;
@@ -183,8 +242,10 @@ public class VodController extends BaseController {
     TextView seekTime; //右上角进度时间显示
     TextView mScreenDisplay; //增加屏显开关
     LinearLayout tv_screen_display; //增加屏显布局
+    TextView mCastBtn;
     TextView net_play_speed;
     private boolean hasDanmu = false;
+    private boolean showParse;
 
     LockRunnable lockRunnable = new LockRunnable();
     private boolean isLock = false;
@@ -218,7 +279,8 @@ public class VodController extends BaseController {
     };
     
     private void showLockView() {
-        if (previewMode) {
+        if (previewMode || getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT) {
+            if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT) isLock = false;
             mHandler.removeCallbacks(lockRunnable);
             if (mLockView != null) {
                 mLockView.setVisibility(INVISIBLE);
@@ -247,8 +309,12 @@ public class VodController extends BaseController {
         mTotalTime = findViewById(R.id.total_time);
         mPlayTitle = findViewById(R.id.tv_info_name);
         mPlayTitle1 = findViewById(R.id.tv_info_name1);
+        mPlayLabel = findViewById(R.id.play_label);
         mPlayLoadNetSpeedRightTop = findViewById(R.id.tv_play_load_net_speed_right_top);
         mSeekBar = findViewById(R.id.seekBar);
+        CircleThumbDrawable seekThumb = new CircleThumbDrawable(getContext());
+        mSeekBar.setThumb(seekThumb);
+        mSeekBar.setThumbOffset(seekThumb.getIntrinsicWidth() / 2);
         mProgressRoot = findViewById(R.id.tv_progress_container);
         mProgressIcon = findViewById(R.id.tv_progress_icon);
         mProgressText = findViewById(R.id.tv_progress_text);
@@ -280,14 +346,20 @@ public class VodController extends BaseController {
         mAudioTrackBtn = findViewById(R.id.audio_track_select);
         mDanmuSettingBtn = findViewById(R.id.danmu_setting);
         mDanmuSearchUiBtn = findViewById(R.id.danmu_search_ui);
-        updateDanmuSearchUiBtn();
         mLandscapePortraitBtn = findViewById(R.id.landscape_portrait);
         backBtn = findViewById(R.id.tv_back);
         seekTime = findViewById(R.id.tv_seek_time);
         mScreenDisplay = findViewById(R.id.screen_display);
+        mCastBtn = findViewById(R.id.play_cast);
+        updateDanmuSearchUiBtn();
         backBtn.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
+                if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT) {
+                    setLandscapePortrait();
+                    hideBottom();
+                    return;
+                }
                 if (getContext() instanceof Activity) {
                     isClickBackBtn = true;
                     ((Activity) getContext()).onBackPressed();
@@ -366,29 +438,111 @@ public class VodController extends BaseController {
                     return;
                 }
 
-                long duration = mControlWrapper.getDuration();
-                long newPosition = (duration * progress) / seekBar.getMax();
-                if (mCurrentTime != null)
-                    mCurrentTime.setText(stringForTime(safeTimeMs(newPosition)));
+                updateSeekBarTime(progress);
             }
 
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) {
-                mIsDragging = true;
-                mControlWrapper.stopProgress();
-                mControlWrapper.stopFadeOut();
+                beginSeekBarTracking();
             }
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                myHandle.removeCallbacks(myRunnable);
-                myHandle.postDelayed(myRunnable, myHandleSeconds);
-                long duration = mControlWrapper.getDuration();
-                long newPosition = (duration * seekBar.getProgress()) / seekBar.getMax();
-                mControlWrapper.seekTo(newPosition);
-                mIsDragging = false;
-                mControlWrapper.startProgress();
-                mControlWrapper.startFadeOut();
+                finishSeekBarTracking();
+            }
+        });
+        mSeekBar.setOnHoverListener(new OnHoverListener() {
+            @Override
+            public boolean onHover(View v, MotionEvent event) {
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_HOVER_ENTER:
+                        keepSeekBarActive();
+                        v.setSelected(true);
+                        v.refreshDrawableState();
+                        v.jumpDrawablesToCurrentState();
+                        v.invalidate();
+                        break;
+                    case MotionEvent.ACTION_HOVER_MOVE:
+                        keepSeekBarActive();
+                        break;
+                    case MotionEvent.ACTION_HOVER_EXIT:
+                        v.setSelected(false);
+                        v.refreshDrawableState();
+                        v.jumpDrawablesToCurrentState();
+                        v.invalidate();
+                        break;
+                }
+                return false;
+            }
+        });
+        mSeekBar.setOnFocusChangeListener(new OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if (hasFocus) {
+                    boolean hasParse = mParseRoot.getVisibility() == VISIBLE && mGridParseView.getAdapter() != null && mGridParseView.getAdapter().getItemCount() > 0;
+                    mSeekBar.setNextFocusUpId(hasParse ? R.id.mGridParseView : R.id.play_next);
+                    keepSeekBarActive();
+                    v.setSelected(true);
+                    v.refreshDrawableState();
+                    v.jumpDrawablesToCurrentState();
+                    v.invalidate();
+                } else {
+                    v.setSelected(false);
+                    v.refreshDrawableState();
+                    v.jumpDrawablesToCurrentState();
+                    v.invalidate();
+                    if (mSeekBarKeyTracking) {
+                        finishSeekBarTracking();
+                    }
+                }
+            }
+        });
+        mSeekBar.setOnKeyListener(new OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                if (keyCode != KeyEvent.KEYCODE_DPAD_LEFT && keyCode != KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    return false;
+                }
+                if (!isInPlaybackState()) {
+                    return true;
+                }
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    beginSeekBarTracking();
+                    mSeekBarKeyTracking = true;
+                    v.setSelected(true);
+                    v.jumpDrawablesToCurrentState();
+                    v.invalidate();
+                    moveSeekBarByKey(keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
+                    return true;
+                } else if (event.getAction() == KeyEvent.ACTION_UP) {
+                    v.setSelected(v.hasFocus());
+                    v.jumpDrawablesToCurrentState();
+                    v.invalidate();
+                    if (mSeekBarKeyTracking) {
+                        finishSeekBarTracking();
+                    }
+                    return true;
+                }
+                return true;
+            }
+        });
+        mSeekBar.setOnGenericMotionListener(new OnGenericMotionListener() {
+            @Override
+            public boolean onGenericMotion(View v, MotionEvent event) {
+                if (event.getAction() != MotionEvent.ACTION_SCROLL || !isInPlaybackState()) {
+                    return false;
+                }
+                float scroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
+                if (scroll == 0) {
+                    scroll = event.getAxisValue(MotionEvent.AXIS_HSCROLL);
+                }
+                if (scroll == 0) {
+                    return false;
+                }
+                beginSeekBarTracking();
+                moveSeekBarByKey(scroll > 0 ? 1 : -1);
+                finishSeekBarTracking();
+                return true;
             }
         });
         mPlayerRetry.setOnClickListener(new OnClickListener() {
@@ -731,6 +885,7 @@ public class VodController extends BaseController {
         });
         //屏显
         int disPlay = Hawk.get(HawkConfig.SCREEN_DISPLAY, GONE);
+        mTopRoot2.setVisibility(disPlay);
         seekTime.setVisibility(disPlay);
         net_play_speed.setVisibility(disPlay);
         mPlayPauseTime.setVisibility(disPlay);
@@ -747,8 +902,19 @@ public class VodController extends BaseController {
                 hideBottom();
             }
         });
-        mNextBtn.setNextFocusLeftId(R.id.screen_display);
+        mCastBtn.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (listener != null) listener.clickCast();
+            }
+        });
+        if (Build.VERSION.SDK_INT < 30) {
+            mCastBtn.setVisibility(GONE);
+        } else {
+            mCastBtn.setVisibility(VISIBLE);
+        }
         mScreenDisplay.setNextFocusRightId(R.id.play_next);
+        mNextBtn.setNextFocusLeftId(R.id.screen_display);
     }
 
     private void hideLiveAboutBtn() {
@@ -768,26 +934,78 @@ public class VodController extends BaseController {
     }
 
     public void initLandscapePortraitBtnInfo() {
-        if(mControlWrapper!=null && mActivity!=null){
-            int width = mControlWrapper.getVideoSize()[0];
-            int height = mControlWrapper.getVideoSize()[1];
-            double screenSqrt = ScreenUtils.getSqrt(mActivity);
-            if (screenSqrt < 10.0 && width <= height) {
-                mLandscapePortraitBtn.setVisibility(View.VISIBLE);
-                mLandscapePortraitBtn.setText("竖屏");
-            }
+        boolean isPortrait = getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT;
+        if (mCurrentTime != null) mCurrentTime.setVisibility(isPortrait ? GONE : VISIBLE);
+        if (mTotalTime != null) mTotalTime.setVisibility(isPortrait ? GONE : VISIBLE);
+        if (isPortrait) {
+            if (backBtn != null) backBtn.setVisibility(INVISIBLE);
+            if (mLockView != null) mLockView.setVisibility(INVISIBLE);
         }
+        updatePortraitMenu(isPortrait);
+
+        if (mLandscapePortraitBtn == null) return;
+        boolean showButton = false;
+        if (mControlWrapper != null && mActivity != null && !ScreenUtils.isTv(mActivity)) {
+            int[] videoSize = mControlWrapper.getVideoSize();
+            int width = videoSize[0];
+            int height = videoSize[1];
+            showButton = width > 0 && height > 0 && width <= height && ScreenUtils.getSqrt(mActivity) < 10.0;
+        }
+        mLandscapePortraitBtn.setVisibility(showButton ? VISIBLE : GONE);
+        if (showButton) mLandscapePortraitBtn.setText(isPortrait ? "横屏" : "竖屏");
+    }
+
+    private void updatePortraitMenu(boolean isPortrait) {
+        if (isPortrait) {
+            mParseRoot.setVisibility(GONE);
+            mPlayLabel.setVisibility(GONE);
+            mPlayrefresh.setVisibility(GONE);
+            mPlayerScaleBtn.setVisibility(GONE);
+            mPlayerIJKBtn.setVisibility(GONE);
+            mPlayerTimeStartEndText.setVisibility(GONE);
+            mPlayerTimeStartBtn.setVisibility(GONE);
+            mPlayerTimeSkipBtn.setVisibility(GONE);
+            mPlayerTimeResetBtn.setVisibility(GONE);
+            mCastBtn.setVisibility(GONE);
+            mZimuBtn.setVisibility(GONE);
+            mAudioTrackBtn.setVisibility(GONE);
+            mDanmuSettingBtn.setVisibility(GONE);
+            mDanmuSearchUiBtn.setVisibility(GONE);
+            mScreenDisplay.setVisibility(GONE);
+            return;
+        }
+
+        mParseRoot.setVisibility(showParse ? VISIBLE : GONE);
+        mPlayrefresh.setVisibility(VISIBLE);
+        mPlayerScaleBtn.setVisibility(VISIBLE);
+        mPlayerTimeStartEndText.setVisibility(VISIBLE);
+        mPlayerTimeStartBtn.setVisibility(VISIBLE);
+        mPlayerTimeSkipBtn.setVisibility(VISIBLE);
+        mPlayerTimeResetBtn.setVisibility(VISIBLE);
+        mZimuBtn.setVisibility(VISIBLE);
+        mScreenDisplay.setVisibility(VISIBLE);
+        mCastBtn.setVisibility(Build.VERSION.SDK_INT < 30 ? GONE : VISIBLE);
+        if (mPlayerConfig != null) updatePlayerCfgView();
+        hideLiveAboutBtn();
+        updateDanmuBtn();
+        updateDanmuSearchUiBtn();
     }
 
     void setLandscapePortrait() {
-        int requestedOrientation = mActivity.getRequestedOrientation();
-        if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE || requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE || requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE) {
-            mLandscapePortraitBtn.setText("横屏");
-            mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
-        } else if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT || requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT || requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT) {
+        if (mActivity == null) return;
+        if (mActivity.getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT) {
             mLandscapePortraitBtn.setText("竖屏");
             mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        } else {
+            mLandscapePortraitBtn.setText("横屏");
+            mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
         }
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        initLandscapePortraitBtnInfo();
     }
 
     void initSubtitleInfo() {
@@ -801,7 +1019,9 @@ public class VodController extends BaseController {
     }
 
     public void showParse(boolean userJxList) {
-        mParseRoot.setVisibility(userJxList ? VISIBLE : GONE);
+        showParse = userJxList;
+        boolean isPortrait = getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT;
+        mParseRoot.setVisibility(showParse && !isPortrait ? VISIBLE : GONE);
     }
 
     private JSONObject mPlayerConfig = null;
@@ -870,7 +1090,27 @@ public class VodController extends BaseController {
 
     public void updateDanmuSearchUiBtn() {
         if (mDanmuSearchUiBtn == null) return;
-        mDanmuSearchUiBtn.setVisibility(ApiConfig.get().hasDanmuSearchUi() ? VISIBLE : GONE);
+        boolean hasDanmuSearchUi = ApiConfig.get().hasDanmuSearchUi();
+        mDanmuSearchUiBtn.setVisibility(hasDanmuSearchUi ? VISIBLE : GONE);
+        updatePlayLabelVisibility();
+    }
+
+    private void updatePlayLabelVisibility() {
+        if (mPlayLabel == null || mPlayBtnGroup == null) return;
+        boolean hidePlayLabel = false;
+        String prevText = null;
+        for (int i = 0; i < mPlayBtnGroup.getChildCount(); i++) {
+            View child = mPlayBtnGroup.getChildAt(i);
+            if (child == mPlayLabel || child.getVisibility() != VISIBLE || !(child instanceof TextView)) continue;
+            CharSequence text = ((TextView) child).getText();
+            String currentText = text == null ? "" : text.toString().trim();
+            if ("弹幕".equals(prevText) && ("搜弹幕".equals(currentText) || "弹幕搜索".equals(currentText))) {
+                hidePlayLabel = true;
+                break;
+            }
+            prevText = currentText;
+        }
+        mPlayLabel.setVisibility(hidePlayLabel ? GONE : VISIBLE);
     }
 
     public interface VodControlListener {
@@ -898,6 +1138,10 @@ public class VodController extends BaseController {
 
         void startPlayUrl(String url, HashMap<String, String> headers);
 
+        void onM3u8ProxyUrl(String proxyUrl, String sourceUrl);
+
+        void clickCast();
+
         void setAllowSwitchPlayer(boolean isAllow);
     }
 
@@ -908,6 +1152,86 @@ public class VodController extends BaseController {
     private VodControlListener listener;
 
     private boolean skipEnd = true;
+
+    private void keepSeekBarActive() {
+        if (myHandle != null && myRunnable != null) {
+            myHandle.removeCallbacks(myRunnable);
+            myHandle.postDelayed(myRunnable, myHandleSeconds);
+        }
+        mHandler.removeMessages(1002);
+        mHandler.removeMessages(1003);
+        if (mBottomRoot != null && mBottomRoot.getVisibility() != VISIBLE) {
+            mHandler.sendEmptyMessage(1002);
+        }
+    }
+
+    private void beginSeekBarTracking() {
+        keepSeekBarActive();
+        if (mIsDragging) {
+            return;
+        }
+        mIsDragging = true;
+        mControlWrapper.stopProgress();
+        mControlWrapper.stopFadeOut();
+    }
+
+    private void finishSeekBarTracking() {
+        keepSeekBarActive();
+        long newPosition = getSeekBarPosition(mSeekBar.getProgress());
+        mControlWrapper.seekTo(newPosition);
+        mIsDragging = false;
+        mSeekBarKeyTracking = false;
+        mControlWrapper.startProgress();
+        mControlWrapper.startFadeOut();
+    }
+
+    private long getSeekBarPosition(int progress) {
+        long duration = safeTimeMs(mControlWrapper.getDuration());
+        int max = mSeekBar == null ? 0 : mSeekBar.getMax();
+        if (duration <= 0 || max <= 0) {
+            return 0;
+        }
+        return (duration * progress) / max;
+    }
+
+    private void updateSeekBarTime(int progress) {
+        long newPosition = getSeekBarPosition(progress);
+        if (mCurrentTime != null) {
+            mCurrentTime.setText(stringForTime(safeTimeMs(newPosition)));
+        }
+    }
+
+    private void moveSeekBarByKey(int dir) {
+        int duration = safeTimeMs(mControlWrapper.getDuration());
+        if (duration <= 0 || mSeekBar.getMax() <= 0) {
+            return;
+        }
+        int progress = mSeekBar.getProgress() + getSeekBarKeyProgress(duration) * dir;
+        if (progress < 0) {
+            progress = 0;
+        } else if (progress > mSeekBar.getMax()) {
+            progress = mSeekBar.getMax();
+        }
+        mSeekBar.setProgress(progress);
+        updateSeekBarTime(progress);
+        updateSeekUI(safeTimeMs(mControlWrapper.getCurrentPosition()), safeTimeMs(getSeekBarPosition(progress)), duration);
+    }
+
+    private int getSeekBarKeyProgress(int duration) {
+        long increment;
+        if (duration > 3 * 60 * 60 * 1000) {
+            increment = 5 * 60 * 1000;
+        } else if (duration > 30 * 60 * 1000) {
+            increment = 60 * 1000;
+        } else if (duration > 15 * 60 * 1000) {
+            increment = 30 * 1000;
+        } else if (duration > 10 * 60 * 1000) {
+            increment = 15 * 1000;
+        } else {
+            increment = 10 * 1000;
+        }
+        return Math.max(1, (int) (increment * mSeekBar.getMax() / duration));
+    }
 
     @SuppressLint("SetTextI18n")
     @Override
@@ -1407,7 +1731,9 @@ public class VodController extends BaseController {
             LOG.i("echo-m3u8内容解析：未检测到广告");
             listener.startPlayUrl(url, headers);
         } else {
-            listener.startPlayUrl(ControlManager.get().getAddress(true) + "proxyM3u8", headers);
+            String proxyUrl = ControlManager.get().getAddress(true) + "proxyM3u8";
+            listener.onM3u8ProxyUrl(proxyUrl, url);
+            listener.startPlayUrl(proxyUrl, headers);
             Toast.makeText(getContext(), "已移除视频广告 "+M3u8.currentAdCount+" 条", Toast.LENGTH_SHORT).show();
         }
     }
@@ -1509,5 +1835,95 @@ public class VodController extends BaseController {
         Thunder.stop(false);//停止磁力下载
         Jianpian.finish();//停止p2p下载
         App.getInstance().setDashData(null);
+    }
+
+    private static class CircleThumbDrawable extends Drawable {
+        private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final int normalSize;
+        private final int activeSize;
+        private final float strokeWidth;
+        private boolean active;
+
+        CircleThumbDrawable(Context context) {
+            normalSize = dp(context, 12);
+            activeSize = dp(context, 16);
+            strokeWidth = dp(context, 2);
+            fillPaint.setStyle(Paint.Style.FILL);
+            fillPaint.setColor(Color.WHITE);
+            strokePaint.setStyle(Paint.Style.STROKE);
+            strokePaint.setStrokeWidth(strokeWidth);
+            strokePaint.setColor(Color.parseColor("#FF4081"));
+        }
+
+        @Override
+        public void draw(@NonNull Canvas canvas) {
+            Rect bounds = getBounds();
+            float cx = bounds.exactCenterX();
+            float cy = bounds.exactCenterY();
+            int size = active ? activeSize : normalSize;
+            float radius = Math.max(0, size / 2f - strokeWidth / 2f);
+            canvas.drawCircle(cx, cy, radius, fillPaint);
+            canvas.drawCircle(cx, cy, radius, strokePaint);
+        }
+
+        @Override
+        public boolean isStateful() {
+            return true;
+        }
+
+        @Override
+        protected boolean onStateChange(int[] stateSet) {
+            boolean newActive = false;
+            if (stateSet != null) {
+                for (int state : stateSet) {
+                    if (state == android.R.attr.state_pressed
+                            || state == android.R.attr.state_focused
+                            || state == android.R.attr.state_selected) {
+                        newActive = true;
+                        break;
+                    }
+                }
+            }
+            if (active == newActive) {
+                return false;
+            }
+            active = newActive;
+            invalidateSelf();
+            return true;
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+            fillPaint.setAlpha(alpha);
+            strokePaint.setAlpha(alpha);
+            invalidateSelf();
+        }
+
+        @Override
+        public void setColorFilter(ColorFilter colorFilter) {
+            fillPaint.setColorFilter(colorFilter);
+            strokePaint.setColorFilter(colorFilter);
+            invalidateSelf();
+        }
+
+        @Override
+        public int getOpacity() {
+            return PixelFormat.TRANSLUCENT;
+        }
+
+        @Override
+        public int getIntrinsicWidth() {
+            return activeSize;
+        }
+
+        @Override
+        public int getIntrinsicHeight() {
+            return activeSize;
+        }
+
+        private static int dp(Context context, float value) {
+            return (int) (value * context.getResources().getDisplayMetrics().density + 0.5f);
+        }
     }
 }

@@ -533,6 +533,12 @@ public class QuickJSContext {
 
     public interface Console {
         void log(String info);
+
+        void info(String s);
+
+        void warn(String s);
+
+        void error(String s);
     }
 
     public static abstract class DefaultModuleLoader extends ModuleLoader {

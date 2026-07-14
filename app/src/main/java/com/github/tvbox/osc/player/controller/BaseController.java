@@ -207,6 +207,14 @@ public abstract class BaseController extends BaseVideoController implements Gest
                 && mCurPlayState != VideoView.STATE_PLAYBACK_COMPLETED;
     }
 
+    protected boolean canHandleGesture(MotionEvent event) {
+        return isInPlaybackState()
+                && mIsGestureEnabled
+                && mCanSlide
+                && !isLocked()
+                && !PlayerUtils.isEdge(getContext(), event);
+    }
+
     @Override
     public boolean onTouch(View v, MotionEvent event) {
         return mGestureDetector.onTouchEvent(event);
@@ -260,12 +268,7 @@ public abstract class BaseController extends BaseVideoController implements Gest
      */
     @Override
     public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
-        if (!isInPlaybackState() //不处于播放状态
-                || !mIsGestureEnabled //关闭了手势
-                || !mCanSlide //关闭了滑动手势
-                || isLocked() //锁住了屏幕
-                || PlayerUtils.isEdge(getContext(), e1)) //处于屏幕边沿
-            return true;
+        if (!canHandleGesture(e1)) return true;
         float deltaX = e1.getX() - e2.getX();
         float deltaY = e1.getY() - e2.getY();
         if (mFirstTouch) {

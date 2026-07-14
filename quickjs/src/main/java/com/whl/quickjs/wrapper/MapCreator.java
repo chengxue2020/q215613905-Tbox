@@ -28,12 +28,12 @@ public interface MapCreator {
     }
 
     static JSObject toObj(QuickJSContext ctx, Map<?, ?> map) {
-        JSObject obj = ctx.createJSObject();
+        JSObject obj = ctx.createNewJSObject();
         if (map == null || map.isEmpty()) return obj;
         for (Map.Entry<?, ?> entry : map.entrySet()) {
             Object key = entry.getKey();
             if (key == null) continue;
-            obj.set(String.valueOf(key), toJSValue(ctx, entry.getValue()));
+            ctx.setProperty(obj, String.valueOf(key), toJSValue(ctx, entry.getValue()));
         }
         return obj;
     }
@@ -50,10 +50,10 @@ public interface MapCreator {
         if (value instanceof byte[]) return toArray(ctx, (byte[]) value);
         Class<?> valueClass = value.getClass();
         if (valueClass.isArray()) {
-            JSArray array = ctx.createJSArray();
+            JSArray array = ctx.createNewJSArray();
             int length = Array.getLength(value);
             for (int i = 0; i < length; i++) {
-                array.push(toJSValue(ctx, Array.get(value, i)));
+                array.set(toJSValue(ctx, Array.get(value, i)), i);
             }
             return array;
         }
@@ -61,19 +61,19 @@ public interface MapCreator {
     }
 
     static JSArray toArray(QuickJSContext ctx, List<?> list) {
-        JSArray array = ctx.createJSArray();
+        JSArray array = ctx.createNewJSArray();
         if (list == null || list.isEmpty()) return array;
         for (int i = 0; i < list.size(); i++) {
-            array.push(toJSValue(ctx, list.get(i)));
+            array.set(toJSValue(ctx, list.get(i)), i);
         }
         return array;
     }
 
     static JSArray toArray(QuickJSContext ctx, byte[] bytes) {
-        JSArray array = ctx.createJSArray();
+        JSArray array = ctx.createNewJSArray();
         if (bytes == null || bytes.length == 0) return array;
-        for (byte b : bytes) {
-            array.push((int) b);
+        for (int i = 0; i < bytes.length; i++) {
+            array.set((int) bytes[i], i);
         }
         return array;
     }
