@@ -47,7 +47,9 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
     private final Runnable refreshAutoSizeRunnable = new Runnable() {
         @Override
         public void run() {
-            refreshAutoSize();
+            if (shouldRefreshAutoSize()) {
+                refreshAutoSize();
+            }
         }
     };
     private final Runnable hideSysBarRunnable = new Runnable() {
@@ -82,8 +84,10 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
         super.onResume();
         hideSysBar();
         changeWallpaper(false);
-        refreshAutoSize();
-        scheduleRefreshAutoSize();
+        if (shouldRefreshAutoSize()) {
+            refreshAutoSize();
+            scheduleRefreshAutoSize();
+        }
     }
 
     public void hideSysBar() {
@@ -126,8 +130,14 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
             hideSysBar();
-            scheduleRefreshAutoSize();
+            if (shouldRefreshAutoSize()) {
+                scheduleRefreshAutoSize();
+            }
         }
+    }
+
+    protected boolean shouldRefreshAutoSize() {
+        return false;
     }
 
     private void scheduleRefreshAutoSize() {

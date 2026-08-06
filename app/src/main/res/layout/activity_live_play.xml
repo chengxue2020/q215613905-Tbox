@@ -70,8 +70,8 @@
 			android:id="@+id/ll_typeSelect"
 			android:layout_width="wrap_content"
 			android:layout_height="match_parent"
-			android:layout_margin="20dp"
-			android:background="@drawable/bg_channel_list"
+			android:layout_margin="0dp"
+			android:background="@drawable/bg_channel_list_left"
 			android:baselineAligned="false"
 			android:padding="0dp">
 
@@ -166,10 +166,12 @@
 				android:scrollbars="none" />
 
 			<LinearLayout
+				android:id="@+id/divLoadEpgDivider"
 				android:layout_width="1dp"
 				android:layout_height="match_parent"
 				android:layout_margin="2dp"
-				android:background="#FF333333" />
+				android:background="#FF333333"
+				android:orientation="horizontal" />
 
 			<LinearLayout
 				android:id="@+id/divLoadEpg"
@@ -276,9 +278,9 @@
         android:id="@+id/tvRightSettingLayout"
         android:layout_width="@dimen/vs_640"
         android:layout_height="match_parent"
-        android:layout_margin="20dp"
+        android:layout_margin="0dp"
         android:layout_gravity="right"
-		android:background="@drawable/bg_channel_list"
+		android:background="@drawable/bg_channel_list_right"
 		android:gravity="center_vertical"
         android:orientation="horizontal"
         android:visibility="visible" >
@@ -335,30 +337,12 @@
         android:textStyle="bold"
         android:visibility="gone" />
 
-	<TextView
-		android:id="@+id/tvResolution"
-		android:layout_width="wrap_content"
-		android:layout_height="wrap_content"
-		android:layout_gravity="left|top"
-		android:layout_marginLeft="20mm"
-		android:layout_marginTop="5mm"
-		android:background="@android:color/transparent"
-		android:gravity="center"
-		android:includeFontPadding="false"
-		android:minWidth="@dimen/vs_120"
-		android:paddingLeft="@dimen/vs_12"
-		android:paddingRight="@dimen/vs_12"
-		android:textColor="@android:color/white"
-		android:textSize="22mm"
-		android:visibility="gone"
-		tools:text="[ 1920x1080 ]" />
-
 	<LinearLayout
 		android:layout_width="wrap_content"
 		android:layout_height="wrap_content"
 		android:layout_gravity="right|top"
 		android:layout_marginTop="5mm"
-		android:layout_marginRight="10mm"
+		android:layout_marginRight="20mm"
 		android:gravity="center_vertical"
 		android:orientation="horizontal">
 
@@ -375,7 +359,8 @@
 			android:textColor="@android:color/white"
 			android:textSize="22mm"
 			android:visibility="gone"
-			tools:text="968bps" />
+			tools:text="968bps"
+			tools:ignore="RtlCompat" />
 
 		<TextView
 			android:id="@+id/tvTime"
@@ -598,18 +583,54 @@
 			android:textColor="@color/color_FFFFFF"
 			android:textSize="@dimen/ts_26" />
 
+		<RelativeLayout
+			android:id="@+id/live_status_info"
+			android:layout_width="@dimen/vs_220"
+			android:layout_height="@dimen/vs_128"
+			android:layout_alignParentEnd="true"
+			android:layout_alignParentRight="true"
+			android:layout_marginEnd="@dimen/vs_20"
+			android:layout_marginRight="@dimen/vs_20"
+			android:layout_alignParentBottom="true">
+
 		<TextView
 			android:id="@+id/tv_source"
 			android:layout_width="wrap_content"
 			android:layout_height="wrap_content"
-			android:layout_alignTop="@+id/view_bg"
-			android:layout_marginRight="@dimen/vs_20"
-			android:layout_marginTop="@dimen/vs_10"
-			android:layout_marginBottom="@dimen/vs_10"
+			android:layout_alignParentEnd="true"
 			android:layout_alignParentRight="true"
+			android:layout_alignParentTop="true"
+			android:layout_marginTop="@dimen/vs_10"
 			android:text="源 1/1"
-			android:textColor="@color/color_FFFFFF"
-			android:textSize="@dimen/ts_26" />
+			android:background="@drawable/shape_live_resolution_badge"
+			android:gravity="center"
+			android:includeFontPadding="false"
+			android:paddingLeft="8dp"
+			android:paddingTop="3dp"
+			android:paddingRight="8dp"
+			android:paddingBottom="3dp"
+			android:textColor="#CCFFFFFF"
+			android:textSize="@dimen/ts_20" />
+		<TextView
+			android:id="@+id/tvResolution"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:layout_alignParentEnd="true"
+			android:layout_alignParentRight="true"
+			android:layout_alignParentBottom="true"
+			android:layout_marginBottom="@dimen/vs_10"
+			android:background="@drawable/shape_live_resolution_badge"
+			android:gravity="center"
+			android:includeFontPadding="false"
+			android:paddingLeft="8dp"
+			android:paddingTop="3dp"
+			android:paddingRight="8dp"
+			android:paddingBottom="3dp"
+			android:textColor="#CCFFFFFF"
+			android:textSize="@dimen/ts_20"
+			android:visibility="gone"
+			tools:text="1920 x 1080" />
+		</RelativeLayout>
 	</RelativeLayout>
 
 

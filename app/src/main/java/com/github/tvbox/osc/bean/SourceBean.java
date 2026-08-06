@@ -9,6 +9,7 @@ public class SourceBean {
     private int type;   // 0 xml 1 json 3 Spider
     private int searchable; // 是否可搜索
     private int quickSearch; // 是否可以快速搜索
+    private int changeable = 1;
     private int filterable; // 是否可以站点选择
     private String playerUrl; // 站点解析Url
     private String ext; // 扩展数据
@@ -77,6 +78,14 @@ public class SourceBean {
 
     public void setQuickSearch(int quickSearch) {
         this.quickSearch = quickSearch;
+    }
+
+    public boolean isChangeable() {
+        return changeable != 0;
+    }
+
+    public void setChangeable(int changeable) {
+        this.changeable = changeable;
     }
 
     public int getFilterable() {

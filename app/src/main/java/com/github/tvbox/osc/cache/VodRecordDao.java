@@ -18,7 +18,7 @@ public interface VodRecordDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     long insert(VodRecord record);
 
-    @Query("select * from vodRecord order by updateTime desc limit :size")
+    @Query("select * from vodRecord order by updateTime desc, id desc limit :size")
     List<VodRecord> getAll(int size);
 
     @Query("select * from vodRecord where `sourceKey`=:sourceKey and `vodId`=:vodId")
@@ -38,6 +38,6 @@ public interface VodRecordDao {
      * @param size 保留条数
      * @return
      */
-    @Query("DELETE FROM vodRecord where id NOT IN (SELECT id FROM vodRecord ORDER BY updateTime desc LIMIT :size)")
+    @Query("DELETE FROM vodRecord where id NOT IN (SELECT id FROM vodRecord ORDER BY updateTime desc, id desc LIMIT :size)")
     int reserver(int size);
 }

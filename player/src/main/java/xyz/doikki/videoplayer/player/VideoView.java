@@ -385,15 +385,6 @@ public class VideoView<P extends AbstractPlayer> extends FrameLayout
             } else {
                 resumePlay();
             }
-            if (mRenderView != null) {
-                // 强制请求布局（解决部分设备渲染问题）
-                mRenderView.getView().requestLayout();
-                mRenderView.getView().invalidate();
-            }
-            if (mRenderView != null && mRenderView.getView() != null) {
-                // 统一设置视图可见性
-                mRenderView.getView().setVisibility(View.VISIBLE);
-            }
         }
     }
 

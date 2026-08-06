@@ -25,7 +25,6 @@ import com.github.tvbox.osc.base.BaseLazyFragment;
 import com.github.tvbox.osc.bean.IJKCode;
 import com.github.tvbox.osc.bean.SourceBean;
 import com.github.tvbox.osc.event.RefreshEvent;
-import com.github.tvbox.osc.player.thirdparty.RemoteTVBox;
 import com.github.tvbox.osc.ui.activity.LocalFileActivity;
 import com.github.tvbox.osc.ui.activity.SettingActivity;
 import com.github.tvbox.osc.ui.adapter.ApiHistoryDialogAdapter;
@@ -90,6 +89,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
     private TextView tvDns;
     private TextView tvHomeRec;
     private TextView tvHistoryNum;
+    private TextView tvHistoryMerge;
     private TextView tvSearchView;
     private TextView tvShowPreviewText;
     private TextView tvFastSearchText;
@@ -147,6 +147,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
         tvDns = findViewById(R.id.tvDns);
         tvHomeRec = findViewById(R.id.tvHomeRec);
         tvHistoryNum = findViewById(R.id.tvHistoryNum);
+        tvHistoryMerge = findViewById(R.id.tvHistoryMerge);
         tvSearchView = findViewById(R.id.tvSearchView);
         tvIjkCachePlay = findViewById(R.id.tvIjkCachePlay);
         tvMediaCodec.setText(Hawk.get(HawkConfig.IJK_CODEC, "硬解码"));
@@ -158,6 +159,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
         tvDns.setText(OkGoHelper.dnsHttpsList.get(Hawk.get(HawkConfig.DOH_URL, 0)));
         tvHomeRec.setText(getHomeRecName(Hawk.get(HawkConfig.HOME_REC, HawkConfig.DEFAULT_HOME_REC)));
         tvHistoryNum.setText(HistoryHelper.getHistoryNumName(Hawk.get(HawkConfig.HISTORY_NUM, 0)));
+        tvHistoryMerge.setText(Hawk.get(HawkConfig.HISTORY_MERGE, false) ? "开启" : "关闭");
         tvSearchView.setText(getSearchView(Hawk.get(HawkConfig.SEARCH_VIEW, 0)));
         tvHomeApi.setText(ApiConfig.get().getHomeSourceBean().getName());
         tvScale.setText(PlayerHelper.getScaleName(Hawk.get(HawkConfig.PLAY_SCALE, 0)));
@@ -785,60 +787,13 @@ public class ModelSettingFragment extends BaseLazyFragment {
             }
         });
 
-        findViewById(R.id.llSearchTv).setOnClickListener(new View.OnClickListener() {
+        findViewById(R.id.llHistoryMerge).setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View view) {
-                FastClickCheckUtil.check(view);
-                loadingSearchRemoteTvDialog = new SearchRemoteTvDialog(mActivity);
-                EventBus.getDefault().register(loadingSearchRemoteTvDialog);
-                loadingSearchRemoteTvDialog.setTip("搜索附近TVBox");
-                loadingSearchRemoteTvDialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
-                    @Override
-                    public void onDismiss(DialogInterface dialogInterface) {
-                        EventBus.getDefault().unregister(loadingSearchRemoteTvDialog);
-                    }
-                });
-                loadingSearchRemoteTvDialog.show();
-
-                RemoteTVBox tv = new RemoteTVBox();
-                remoteTvHostList = new ArrayList<>();
-                foundRemoteTv = false;
-                view.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-
-                        new Thread(new Runnable() {
-                            @Override
-                            public void run() {
-                                RemoteTVBox.searchAvalible(tv.new Callback() {
-                                    @Override
-                                    public void found(String viewHost, boolean end) {
-                                        remoteTvHostList.add(viewHost);
-                                        if (end) {
-                                            foundRemoteTv = true;
-                                            EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_SETTING_SEARCH_TV));
-                                        }
-                                    }
-
-                                    @Override
-                                    public void fail(boolean all, boolean end) {
-                                        if (end) {
-                                            if (all) {
-                                                foundRemoteTv = false;
-                                            } else {
-                                                foundRemoteTv = true;
-                                            }
-                                            EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_SETTING_SEARCH_TV));
-                                        }
-                                    }
-                                });
-                            }
-                        }).start();
-
-                    }
-                }, 500);
-
-
+            public void onClick(View v) {
+                FastClickCheckUtil.check(v);
+                boolean historyMerge = !Hawk.get(HawkConfig.HISTORY_MERGE, false);
+                Hawk.put(HawkConfig.HISTORY_MERGE, historyMerge);
+                tvHistoryMerge.setText(historyMerge ? "开启" : "关闭");
             }
         });
 
@@ -1124,7 +1079,6 @@ public class ModelSettingFragment extends BaseLazyFragment {
             }
         }).start();
     }
-
 
     public static SearchRemoteTvDialog loadingSearchRemoteTvDialog;
     public static List<String> remoteTvHostList;

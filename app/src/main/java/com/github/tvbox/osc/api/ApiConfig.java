@@ -9,6 +9,7 @@ import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Base64;
 
+import com.google.android.exoplayer2.util.UriUtil;
 import com.github.catvod.crawler.JarLoader;
 import com.github.catvod.crawler.JsLoader;
 import com.github.catvod.crawler.pyLoader;
@@ -751,6 +752,10 @@ public class ApiConfig {
         SourceBean firstSite = null;
         for (JsonElement opt : infoJson.get("sites").getAsJsonArray()) {
             JsonObject obj = (JsonObject) opt;
+            if (!obj.has("key") || !obj.has("type") || !obj.has("api")) {
+                LOG.i("echo-skip incomplete site config: " + obj);
+                continue;
+            }
             SourceBean sb = new SourceBean();
             String siteKey = obj.get("key").getAsString().trim();
             sb.setKey(siteKey);
@@ -759,6 +764,7 @@ public class ApiConfig {
             sb.setApi(obj.get("api").getAsString().trim());
             sb.setSearchable(DefaultConfig.safeJsonInt(obj, "searchable", 1));
             sb.setQuickSearch(DefaultConfig.safeJsonInt(obj, "quickSearch", 1));
+            sb.setChangeable(DefaultConfig.safeJsonInt(obj, "changeable", 1));
             if(siteKey.startsWith("py_")){
                 sb.setFilterable(1);
             }else {
@@ -1126,7 +1132,7 @@ public class ApiConfig {
         ArrayList<String> scaleItems = new ArrayList<>(Arrays.asList("默认", "16:9", "4:3", "填充", "原始", "裁剪"));
         ArrayList<String> playerDecoderItems = new ArrayList<>(Arrays.asList("系统", "ijk硬解", "ijk软解", "exo"));
         ArrayList<String> timeoutItems = new ArrayList<>(Arrays.asList("5s", "10s", "15s", "20s", "25s", "30s"));
-        ArrayList<String> personalSettingItems = new ArrayList<>(Arrays.asList("显示时间", "显示网速", "显分辨率", "换台反转", "跨选分类"));
+        ArrayList<String> personalSettingItems = new ArrayList<>(Arrays.asList("显示时间", "显示网速", "换台反转", "跨选分类"));
         ArrayList<String> yumItems = new ArrayList<>();
         ArrayList<String> liveApiHistoryItems = new ArrayList<>();
 
@@ -1786,12 +1792,8 @@ public class ApiConfig {
                 url = "http://" + url;
             }
             if(url.startsWith("clan://"))url=clanToAddress(url);
-            String base = url.substring(0,url.lastIndexOf("/") + 1);
-            String parent = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
-            int parentEnd = parent.lastIndexOf("/");
-            if (parentEnd >= 0) parent = parent.substring(0, parentEnd + 1);
-            content = content.replace("../", parent);
-            content = content.replace("./", base);
+            content = content.replace("../", UriUtil.resolve(url, "../"));
+            content = content.replace("./", UriUtil.resolve(url, "./"));
         }
         return content;
     }

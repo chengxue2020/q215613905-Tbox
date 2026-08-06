@@ -42,10 +42,8 @@ public class LiveChannelGroupAdapter extends BaseQuickAdapter<LiveChannelGroup, 
         if (selectedGroupIndex == this.selectedGroupIndex) return;
         int preSelectedGroupIndex = this.selectedGroupIndex;
         this.selectedGroupIndex = selectedGroupIndex;
-        if (preSelectedGroupIndex != -1)
-            notifyItemChanged(preSelectedGroupIndex);
-        if (this.selectedGroupIndex != -1)
-            notifyItemChanged(this.selectedGroupIndex);
+        notifyGroupChanged(preSelectedGroupIndex);
+        notifyGroupChanged(this.selectedGroupIndex);
     }
 
     public int getSelectedGroupIndex() {
@@ -55,8 +53,19 @@ public class LiveChannelGroupAdapter extends BaseQuickAdapter<LiveChannelGroup, 
     public void setFocusedGroupIndex(int focusedGroupIndex) {
         this.focusedGroupIndex = focusedGroupIndex;
         if (this.focusedGroupIndex != -1)
-            notifyItemChanged(this.focusedGroupIndex);
+            notifyGroupChanged(this.focusedGroupIndex);
         else if (this.selectedGroupIndex != -1)
-            notifyItemChanged(this.selectedGroupIndex);
+            notifyGroupChanged(this.selectedGroupIndex);
+    }
+
+    public void clearGroupState() {
+        selectedGroupIndex = -1;
+        focusedGroupIndex = -1;
+    }
+
+    private void notifyGroupChanged(int position) {
+        if (position >= 0 && position < getItemCount()) {
+            notifyItemChanged(position);
+        }
     }
 }

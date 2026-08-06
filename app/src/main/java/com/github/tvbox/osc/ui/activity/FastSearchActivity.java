@@ -495,6 +495,7 @@ public class FastSearchActivity extends BaseActivity {
     private final List<SearchTask> waitingSearchTasks = Collections.synchronizedList(new ArrayList<SearchTask>());
     private final Set<String> startedSearchKeys = Collections.synchronizedSet(new HashSet<String>());
     private final Set<String> releasedSearchKeys = Collections.synchronizedSet(new HashSet<String>());
+    private int startedSearchCountOffset = 0;
     private final AtomicInteger searchTokenSeq = new AtomicInteger(0);
     private final AtomicInteger totalSearchCount = new AtomicInteger(0);
     private final AtomicInteger timedOutSearchCount = new AtomicInteger(0);
@@ -522,6 +523,7 @@ public class FastSearchActivity extends BaseActivity {
             waitingSearchTasks.clear();
             startedSearchKeys.clear();
             releasedSearchKeys.clear();
+            startedSearchCountOffset = 0;
             currentSearchToken = String.valueOf(searchTokenSeq.incrementAndGet());
             searchPaused = false;
             totalSearchCount.set(0);
@@ -774,6 +776,7 @@ public class FastSearchActivity extends BaseActivity {
         }
         currentSearchToken = String.valueOf(searchTokenSeq.incrementAndGet());
         waitingSearchTasks.clear();
+        startedSearchCountOffset = Math.max(0, totalSearchCount.get() - allRunCount.get());
         startedSearchKeys.clear();
         releasedSearchKeys.clear();
         for (String sourceKey : sourceKeys) {
@@ -885,7 +888,7 @@ public class FastSearchActivity extends BaseActivity {
 
     private int getStartedSearchCount() {
         synchronized (startedSearchKeys) {
-            return startedSearchKeys.size();
+            return startedSearchCountOffset + startedSearchKeys.size();
         }
     }
 

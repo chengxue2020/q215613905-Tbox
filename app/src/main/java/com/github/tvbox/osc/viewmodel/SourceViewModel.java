@@ -87,6 +87,7 @@ public class SourceViewModel extends ViewModel {
     public MutableLiveData<AbsXml> listResult;
     public MutableLiveData<AbsXml> searchResult;
     public MutableLiveData<AbsXml> quickSearchResult;
+    public MutableLiveData<AbsXml> detailFallbackSearchResult;
     public MutableLiveData<AbsXml> detailResult;
     public MutableLiveData<JSONObject> actionResult;
     public MutableLiveData<JSONObject> playResult;
@@ -99,6 +100,7 @@ public class SourceViewModel extends ViewModel {
         listResult = new MutableLiveData<>();
         searchResult = new MutableLiveData<>();
         quickSearchResult = new MutableLiveData<>();
+        detailFallbackSearchResult = new MutableLiveData<>();
         detailResult = new MutableLiveData<>();
         actionResult = new MutableLiveData<>();
         playResult = new MutableLiveData<>();
@@ -802,9 +804,17 @@ public class SourceViewModel extends ViewModel {
     }
 
     public void getSearch(String sourceKey, String wd, String searchToken) {
+        getSearch(sourceKey, wd, searchToken, searchResult, "search");
+    }
+
+    public void getDetailFallbackSearch(String sourceKey, String wd, String searchToken) {
+        getSearch(sourceKey, wd, searchToken, detailFallbackSearchResult, "detail_fallback_search");
+    }
+
+    private void getSearch(String sourceKey, String wd, String searchToken, MutableLiveData<AbsXml> result, String requestTag) {
         SourceBean sourceBean = ApiConfig.get().getSource(sourceKey);
         if (sourceBean == null) {
-            postEmptySearchResult(searchResult, sourceKey, searchToken);
+            postEmptySearchResult(result, sourceKey, searchToken);
             return;
         }
         int type = sourceBean.getType();
@@ -813,19 +823,19 @@ public class SourceViewModel extends ViewModel {
                 Spider sp = ApiConfig.get().getCSP(sourceBean);
                 String search = sp.searchContent(wd, false);
                 if(!TextUtils.isEmpty(search)){
-                    json(searchResult, search, sourceBean.getKey(), searchToken);
+                    json(result, search, sourceBean.getKey(), searchToken);
                 } else {
-                    json(searchResult, "", sourceBean.getKey(), searchToken);
+                    json(result, "", sourceBean.getKey(), searchToken);
                 }
             } catch (Throwable th) {
                 th.printStackTrace();
-                json(searchResult, "", sourceBean.getKey(), searchToken);
+                json(result, "", sourceBean.getKey(), searchToken);
             }
         } else if (type == 0 || type == 1) {
             OkGo.<String>get(sourceBean.getApi())
                     .params("wd", wd)
                     .params(type == 1 ? "ac" : null, type == 1 ? "detail" : null)
-                    .tag("search")
+                    .tag(requestTag)
                     .execute(new AbsCallback<String>() {
                         @Override
                         public String convertResponse(okhttp3.Response response) throws Throwable {
@@ -840,17 +850,17 @@ public class SourceViewModel extends ViewModel {
                         public void onSuccess(Response<String> response) {
                             if (type == 0) {
                                 String xml = response.body();
-                                xml(searchResult, xml, sourceBean.getKey(), searchToken);
+                                xml(result, xml, sourceBean.getKey(), searchToken);
                             } else {
                                 String json = response.body();
-                                json(searchResult, json, sourceBean.getKey(), searchToken);
+                                json(result, json, sourceBean.getKey(), searchToken);
                             }
                         }
 
                         @Override
                         public void onError(Response<String> response) {
                             super.onError(response);
-                            postEmptySearchResult(searchResult, sourceBean.getKey(), searchToken);
+                            postEmptySearchResult(result, sourceBean.getKey(), searchToken);
                         }
                     });
         }else if (type == 4) {
@@ -868,7 +878,7 @@ public class SourceViewModel extends ViewModel {
             }
 
             GetRequest<String> request = OkGo.<String>get(sourceBean.getApi())
-                    .tag("search")
+                    .tag(requestTag)
                     .params("wd", queryWd)
                     .params("ac" ,"detail")
                     .params("quick" ,"false");
@@ -891,20 +901,20 @@ public class SourceViewModel extends ViewModel {
                     public void onSuccess(Response<String> response) {
                             String json = response.body();
 //                            LOG.i("echo-t4 search onSuccess"+json);
-                            json(searchResult, json, sourceBean.getKey(), searchToken);
+                            json(result, json, sourceBean.getKey(), searchToken);
                     }
 
                     @Override
                     public void onError(Response<String> response) {
                         LOG.i("echo-t4 search-onError");
                         super.onError(response);
-                        postEmptySearchResult(searchResult, sourceBean.getKey(), searchToken);
+                        postEmptySearchResult(result, sourceBean.getKey(), searchToken);
                     }
                 });
                 }
             });
         } else {
-            postEmptySearchResult(searchResult, sourceBean.getKey(), searchToken);
+            postEmptySearchResult(result, sourceBean.getKey(), searchToken);
         }
     }
     // searchContent
@@ -1738,7 +1748,7 @@ public class SourceViewModel extends ViewModel {
             }
             return data;
         } catch (Exception e) {
-            if (searchResult == result || quickSearchResult == result) {
+            if (searchResult == result || quickSearchResult == result || detailFallbackSearchResult == result) {
                 postEmptySearchResult(result, sourceKey, searchToken);
             } else if (result != null) {
                 result.postValue(null);
@@ -1788,7 +1798,7 @@ public class SourceViewModel extends ViewModel {
             }
             return data;
         } catch (Exception e) {
-            if (searchResult == result || quickSearchResult == result) {
+            if (searchResult == result || quickSearchResult == result || detailFallbackSearchResult == result) {
                 postEmptySearchResult(result, sourceKey, searchToken);
             } else if (result != null) {
                 result.postValue(null);

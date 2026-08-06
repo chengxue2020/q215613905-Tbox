@@ -16,7 +16,9 @@ import com.google.gson.reflect.TypeToken;
 
 import com.orhanobut.hawk.Hawk;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * @author pj567
@@ -47,7 +49,11 @@ public class RoomDataManger {
     }
 
     public static void insertVodRecord(String sourceKey, VodInfo vodInfo) {
-        VodRecord record = AppDataManager.get().getVodRecordDao().getVodRecord(sourceKey, vodInfo.id);
+        VodRecordDao dao = AppDataManager.get().getVodRecordDao();
+        if (Hawk.get(HawkConfig.HISTORY_MERGE, false)) {
+            removeSameNameVodRecords(dao, sourceKey, vodInfo);
+        }
+        VodRecord record = dao.getVodRecord(sourceKey, vodInfo.id);
         if (record == null) {
             record = new VodRecord();
         }
@@ -55,7 +61,7 @@ public class RoomDataManger {
         record.vodId = vodInfo.id;
         record.updateTime = System.currentTimeMillis();
         record.dataJson = getVodInfoGson().toJson(vodInfo);
-        AppDataManager.get().getVodRecordDao().insert(record);
+        dao.insert(record);
     }
 
     public static VodInfo getVodInfo(String sourceKey, String vodId) {
@@ -82,14 +88,13 @@ public class RoomDataManger {
     }
 
     public static List<VodInfo> getAllVodRecord(int limit) {
-        int count = AppDataManager.get().getVodRecordDao().getCount();
+        VodRecordDao dao = AppDataManager.get().getVodRecordDao();
         Integer index = Hawk.get(HawkConfig.HISTORY_NUM, 0);
         Integer hisNum = HistoryHelper.getHisNum(index);
-        if ( count > hisNum ) {
-            AppDataManager.get().getVodRecordDao().reserver(hisNum);
-        }
-        List<VodRecord> recordList = AppDataManager.get().getVodRecordDao().getAll(limit);
+        List<VodRecord> recordList = dao.getAll(Integer.MAX_VALUE);
         List<VodInfo> vodInfoList = new ArrayList<>();
+        boolean historyMerge = Hawk.get(HawkConfig.HISTORY_MERGE, false);
+        Set<String> historyNames = historyMerge ? new HashSet<String>() : null;
         if (recordList != null) {
             for (VodRecord record : recordList) {
                 VodInfo info = null;
@@ -105,11 +110,41 @@ public class RoomDataManger {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                if (info != null)
-                    vodInfoList.add(info);
+                String name = getVodRecordName(info);
+                if (info != null) {
+                    if (!historyMerge || TextUtils.isEmpty(name) || historyNames.add(name)) {
+                        vodInfoList.add(info);
+                    }
+                }
             }
         }
-        return vodInfoList;
+        if (dao.getCount() > hisNum) {
+            dao.reserver(hisNum);
+        }
+        int size = Math.min(vodInfoList.size(), Math.min(limit, hisNum));
+        return new ArrayList<>(vodInfoList.subList(0, size));
+    }
+
+    private static void removeSameNameVodRecords(VodRecordDao dao, String sourceKey, VodInfo vodInfo) {
+        String name = getVodRecordName(vodInfo);
+        if (TextUtils.isEmpty(name)) return;
+        for (VodRecord record : dao.getAll(Integer.MAX_VALUE)) {
+            if (TextUtils.equals(sourceKey, record.sourceKey) && TextUtils.equals(vodInfo.id, record.vodId)) {
+                continue;
+            }
+            try {
+                VodInfo history = getVodInfoGson().fromJson(record.dataJson, new TypeToken<VodInfo>() {
+                }.getType());
+                if (TextUtils.equals(name, getVodRecordName(history))) {
+                    dao.delete(record);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private static String getVodRecordName(VodInfo vodInfo) {
+        return vodInfo == null || vodInfo.name == null ? "" : vodInfo.name.trim();
     }
 
     public static void insertVodCollect(String sourceKey, VodInfo vodInfo) {

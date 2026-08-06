@@ -49,6 +49,11 @@ public class HistoryActivity extends BaseActivity {
     }
 
     @Override
+    protected boolean shouldRefreshAutoSize() {
+        return true;
+    }
+
+    @Override
     protected void init() {
         initView();
         initData();
