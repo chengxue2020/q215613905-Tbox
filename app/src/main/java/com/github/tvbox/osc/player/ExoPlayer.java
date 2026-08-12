@@ -1,6 +1,7 @@
 package com.github.tvbox.osc.player;
 
 import android.content.Context;
+import android.os.Looper;
 import android.util.Pair;
 
 import com.github.tvbox.osc.util.AudioTrackMemory;
@@ -9,15 +10,26 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.DefaultRenderersFactory;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.Player;
+import com.google.android.exoplayer2.Renderer;
 import com.google.android.exoplayer2.RenderersFactory;
 import com.google.android.exoplayer2.Tracks;
 import com.google.android.exoplayer2.source.TrackGroup;
 import com.google.android.exoplayer2.source.TrackGroupArray;
+import com.google.android.exoplayer2.text.Cue;
+import com.google.android.exoplayer2.text.CueGroup;
+import com.google.android.exoplayer2.text.TextOutput;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.trackselection.MappingTrackSelector;
+import com.google.android.exoplayer2.util.MimeTypes;
 
+import java.util.ArrayList;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import xyz.doikki.videoplayer.exo.ExoMediaPlayer;
@@ -25,6 +37,10 @@ import xyz.doikki.videoplayer.exo.ExoMediaPlayer;
 public class ExoPlayer extends ExoMediaPlayer {
 
     private static AudioTrackMemory memory;
+    private volatile long internalSubtitleDelayUs;
+    private OnCuesListener onCuesListener;
+    private boolean defaultSubtitleTrackSelected;
+    private boolean defaultSubtitleTrackSelectionClosed;
 
     public ExoPlayer(Context context) {
         super(context);
@@ -40,8 +56,47 @@ public class ExoPlayer extends ExoMediaPlayer {
         memory = AudioTrackMemory.getInstance(context);
     }
 
+    @Override
+    public void initPlayer() {
+        super.initPlayer();
+        mInternalPlayer.addListener(new Player.Listener() {
+            @Override
+            public void onTracksChanged(Tracks tracks) {
+                loadDefaultSubtitleTrackBeforeReady();
+            }
+
+            @Override
+            public void onPlaybackStateChanged(int playbackState) {
+                if (playbackState == Player.STATE_READY) {
+                    defaultSubtitleTrackSelectionClosed = true;
+                }
+            }
+
+            @Override
+            public void onCues(CueGroup cueGroup) {
+                OnCuesListener listener = onCuesListener;
+                if (listener != null) {
+                    listener.onCues(cueGroup.cues);
+                }
+            }
+        });
+        LOG.i("echo-exo-cues-listener-ready");
+    }
+
+    @Override
+    public void setDataSource(String path, Map<String, String> headers) {
+        defaultSubtitleTrackSelected = false;
+        defaultSubtitleTrackSelectionClosed = false;
+        super.setDataSource(path, headers);
+    }
+
     private RenderersFactory buildRenderersFactory(Context context) {
-        DefaultRenderersFactory factory = new DefaultRenderersFactory(context)
+        DefaultRenderersFactory factory = new SubtitleOffsetRenderersFactory(context, new SubtitleDelayProvider() {
+            @Override
+            public long getDelayUs() {
+                return internalSubtitleDelayUs;
+            }
+        })
                 .setEnableDecoderFallback(true)
                 .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER);
         try {
@@ -61,19 +116,20 @@ public class ExoPlayer extends ExoMediaPlayer {
 
         for (int rendererIndex = 0; rendererIndex < mappedInfo.getRendererCount(); rendererIndex++) {
             int type = mappedInfo.getRendererType(rendererIndex);
-            if (type != C.TRACK_TYPE_AUDIO && type != C.TRACK_TYPE_TEXT) continue;
+            if (type != C.TRACK_TYPE_AUDIO && type != C.TRACK_TYPE_VIDEO && type != C.TRACK_TYPE_TEXT) continue;
 
             TrackGroupArray groups = mappedInfo.getTrackGroups(rendererIndex);
             for (int groupIndex = 0; groupIndex < groups.length; groupIndex++) {
                 TrackGroup group = groups.get(groupIndex);
                 for (int trackIndex = 0; trackIndex < group.length; trackIndex++) {
                     Format fmt = group.getFormat(trackIndex);
+                    if (type == C.TRACK_TYPE_TEXT && isUndeclaredClosedCaptionTrack(fmt)) continue;
                     String language = getLanguage(fmt);
-                    String detail = getName(fmt);
+                    String detail = type == C.TRACK_TYPE_VIDEO ? getVideoName(fmt) : getName(fmt);
                     TrackInfoBean bean = new TrackInfoBean();
                     bean.language = language;
-                    bean.name = buildDisplayName(type == C.TRACK_TYPE_AUDIO ? "\u97f3\u8f68" : "\u5b57\u5e55",
-                            type == C.TRACK_TYPE_AUDIO ? data.getAudio().size() + 1 : data.getSubtitle().size() + 1,
+                    bean.name = buildDisplayName(type == C.TRACK_TYPE_AUDIO ? "\u97f3\u8f68" : type == C.TRACK_TYPE_VIDEO ? "\u89c6\u8f68" : "\u5b57\u5e55",
+                            type == C.TRACK_TYPE_AUDIO ? data.getAudio().size() + 1 : type == C.TRACK_TYPE_VIDEO ? data.getVideo().size() + 1 : data.getSubtitle().size() + 1,
                             language, detail);
                     bean.renderId = rendererIndex;
                     bean.trackGroupId = groupIndex;
@@ -81,9 +137,12 @@ public class ExoPlayer extends ExoMediaPlayer {
                     bean.groupIndex = groupIndex;
                     bean.index = trackIndex;
                     bean.selected = isCurrentTrackSelected(fmt, type);
+                    bean.bitmapSubtitle = type == C.TRACK_TYPE_TEXT && isBitmapSubtitle(fmt);
 
                     if (type == C.TRACK_TYPE_AUDIO) {
                         data.addAudio(bean);
+                    } else if (type == C.TRACK_TYPE_VIDEO) {
+                        data.addVideo(bean);
                     } else {
                         data.addSubtitle(bean);
                     }
@@ -120,7 +179,6 @@ public class ExoPlayer extends ExoMediaPlayer {
                 LOG.i("echo-setTrack: Invalid track index - group:" + groupIndex + ", track:" + trackIndex);
                 return;
             }
-
             DefaultTrackSelector.SelectionOverride override =
                     new DefaultTrackSelector.SelectionOverride(groupIndex, trackIndex);
             DefaultTrackSelector.Parameters.Builder builder = trackSelector.buildUponParameters();
@@ -129,7 +187,7 @@ public class ExoPlayer extends ExoMediaPlayer {
             builder.setSelectionOverride(rendererIndex, groups, override);
             trackSelector.setParameters(builder.build());
 
-            if (!playKey.isEmpty()) {
+            if (mappedInfo.getRendererType(rendererIndex) == C.TRACK_TYPE_AUDIO && !playKey.isEmpty()) {
                 memory.save(playKey, groupIndex, trackIndex);
             }
         } catch (Exception e) {
@@ -150,6 +208,36 @@ public class ExoPlayer extends ExoMediaPlayer {
         setTrack(audioRendererIndex, pair.first, pair.second, "");
     }
 
+    public void loadDefaultSubtitleTrack() {
+        if (defaultSubtitleTrackSelected) return;
+        TrackInfo trackInfo = getTrackInfo();
+        List<TrackInfoBean> subtitles = trackInfo.getSubtitle();
+        if (subtitles.isEmpty()) return;
+
+        defaultSubtitleTrackSelected = true;
+        TrackInfoBean target = subtitles.get(0);
+        for (TrackInfoBean subtitle : subtitles) {
+            if ("国语".equals(subtitle.language)) {
+                target = subtitle;
+                break;
+            }
+        }
+        setTrack(target, "");
+    }
+
+    private void loadDefaultSubtitleTrackBeforeReady() {
+        if (defaultSubtitleTrackSelectionClosed) return;
+        loadDefaultSubtitleTrack();
+    }
+
+    public void setOnCuesListener(OnCuesListener listener) {
+        onCuesListener = listener;
+    }
+
+    public void setInternalSubtitleDelay(int milliseconds) {
+        internalSubtitleDelayUs = milliseconds * 1000L;
+    }
+
     private int findAudioRendererIndex(MappingTrackSelector.MappedTrackInfo mappedInfo) {
         if (mappedInfo == null) return C.INDEX_UNSET;
         for (int i = 0; i < mappedInfo.getRendererCount(); i++) {
@@ -164,6 +252,18 @@ public class ExoPlayer extends ExoMediaPlayer {
         if (groupIndex < 0 || groupIndex >= groups.length) return false;
         TrackGroup group = groups.get(groupIndex);
         return trackIndex >= 0 && trackIndex < group.length;
+    }
+
+    private boolean isBitmapSubtitle(Format format) {
+        if (format == null || format.sampleMimeType == null) return false;
+        String mimeType = format.sampleMimeType.toLowerCase();
+        return mimeType.contains("pgs") || mimeType.contains("dvb") || mimeType.contains("vobsub");
+    }
+
+    private boolean isUndeclaredClosedCaptionTrack(Format format) {
+        if (format == null || format.accessibilityChannel != Format.NO_VALUE) return false;
+        return MimeTypes.APPLICATION_CEA608.equals(format.sampleMimeType)
+                || MimeTypes.APPLICATION_CEA708.equals(format.sampleMimeType);
     }
 
     private boolean isCurrentTrackSelected(Format format, int trackType) {
@@ -277,8 +377,22 @@ public class ExoPlayer extends ExoMediaPlayer {
         return builder.toString();
     }
 
+    private String getVideoName(Format fmt) {
+        StringBuilder builder = new StringBuilder();
+        appendPart(builder, fmt.label);
+        if (fmt.width > 0 && fmt.height > 0) {
+            appendPart(builder, fmt.width + "x" + fmt.height);
+        }
+        if (fmt.codecs != null && !fmt.codecs.isEmpty()) {
+            appendPart(builder, fmt.codecs.toUpperCase());
+        } else if (fmt.sampleMimeType != null && fmt.sampleMimeType.contains("/")) {
+            appendPart(builder, fmt.sampleMimeType.substring(fmt.sampleMimeType.indexOf('/') + 1).toUpperCase());
+        }
+        return builder.toString();
+    }
+
     private String buildDisplayName(String prefix, int number, String language, String detail) {
-        StringBuilder builder = new StringBuilder(prefix).append(" ").append(number);
+        StringBuilder builder = new StringBuilder(prefix).append(number);
         if (language != null && !language.isEmpty()) {
             builder.append(" - ").append(language);
         }
@@ -296,5 +410,61 @@ public class ExoPlayer extends ExoMediaPlayer {
             builder.append(" / ");
         }
         builder.append(part);
+    }
+
+    public interface OnCuesListener {
+        void onCues(List<Cue> cues);
+    }
+
+    private interface SubtitleDelayProvider {
+        long getDelayUs();
+    }
+
+    private static final class SubtitleOffsetRenderersFactory extends DefaultRenderersFactory {
+        private final SubtitleDelayProvider subtitleDelayProvider;
+
+        SubtitleOffsetRenderersFactory(Context context, SubtitleDelayProvider subtitleDelayProvider) {
+            super(context);
+            this.subtitleDelayProvider = subtitleDelayProvider;
+        }
+
+        @Override
+        protected void buildTextRenderers(Context context, TextOutput output, Looper outputLooper,
+                                          int extensionRendererMode, ArrayList<Renderer> out) {
+            int firstRendererIndex = out.size();
+            super.buildTextRenderers(context, output, outputLooper, extensionRendererMode, out);
+            for (int i = firstRendererIndex; i < out.size(); i++) {
+                Renderer renderer = out.get(i);
+                out.set(i, (Renderer) Proxy.newProxyInstance(Renderer.class.getClassLoader(),
+                        new Class<?>[]{Renderer.class},
+                        new SubtitleOffsetRendererHandler(renderer, subtitleDelayProvider)));
+            }
+        }
+    }
+
+    private static final class SubtitleOffsetRendererHandler implements InvocationHandler {
+        private final Renderer renderer;
+        private final SubtitleDelayProvider subtitleDelayProvider;
+
+        SubtitleOffsetRendererHandler(Renderer renderer, SubtitleDelayProvider subtitleDelayProvider) {
+            this.renderer = renderer;
+            this.subtitleDelayProvider = subtitleDelayProvider;
+        }
+
+        @Override
+        public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+            Object[] invokeArgs = args;
+            if ("render".equals(method.getName()) && args != null && args.length > 0
+                    && args[0] instanceof Long) {
+                invokeArgs = args.clone();
+                long positionUs = (Long) invokeArgs[0];
+                invokeArgs[0] = Math.max(0, positionUs - subtitleDelayProvider.getDelayUs());
+            }
+            try {
+                return method.invoke(renderer, invokeArgs);
+            } catch (InvocationTargetException e) {
+                throw e.getCause();
+            }
+        }
     }
 }

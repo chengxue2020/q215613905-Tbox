@@ -123,6 +123,21 @@ public class DanmuLoadController {
         releaseView();
     }
 
+    public void close() {
+        DanmakuApi.cancel();
+        loadSeq.incrementAndGet();
+        startedSeq = -1;
+        pendingPrepare = false;
+        releaseView();
+    }
+
+    public void reloadForPlayback() {
+        loadSeq.incrementAndGet();
+        startedSeq = -1;
+        releaseView();
+        pendingPrepare = !TextUtils.isEmpty(danmuText) && DanmuHelper.isOpen();
+    }
+
     public void destroy() {
         reset();
         if (executor != null) {

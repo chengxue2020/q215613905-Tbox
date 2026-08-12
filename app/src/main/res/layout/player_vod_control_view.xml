@@ -156,6 +156,12 @@
         android:textSize="16sp"
         android:textStyle="bold"/>
 
+    <com.google.android.exoplayer2.ui.SubtitleView
+        android:id="@+id/exo_subtitle_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/bottom_container"
         android:layout_width="match_parent"
@@ -320,7 +326,8 @@
                 android:padding="@dimen/vs_10"
                 android:text="片头尾"
                 android:textColor="@color/color_FFFFFF"
-                android:textSize="@dimen/ts_19" />
+                android:textSize="@dimen/ts_19"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/play_time_start"
@@ -404,6 +411,20 @@
                 android:padding="@dimen/vs_10"
                 android:visibility="gone"
                 android:text="音轨"
+                android:textColor="@android:color/white"
+                android:textSize="@dimen/ts_19"/>
+
+            <TextView
+                android:id="@+id/video_track_select"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/vs_5"
+                android:layout_marginRight="@dimen/vs_5"
+                android:background="@drawable/button_dialog_main"
+                android:focusable="true"
+                android:padding="@dimen/vs_10"
+                android:visibility="gone"
+                android:text="视轨"
                 android:textColor="@android:color/white"
                 android:textSize="@dimen/ts_19"/>
 

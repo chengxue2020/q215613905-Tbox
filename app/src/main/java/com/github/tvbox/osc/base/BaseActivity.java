@@ -109,7 +109,8 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
             decorView.setOnSystemUiVisibilityChangeListener(new View.OnSystemUiVisibilityChangeListener() {
                 @Override
                 public void onSystemUiVisibilityChange(int visibility) {
-                    if ((visibility & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) == 0) {
+                    int hiddenBars = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN;
+                    if ((visibility & hiddenBars) != hiddenBars) {
                         decorView.removeCallbacks(hideSysBarRunnable);
                         decorView.postDelayed(hideSysBarRunnable, 300);
                     }

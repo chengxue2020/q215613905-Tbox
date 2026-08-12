@@ -81,6 +81,13 @@ public abstract class AbstractPlayer {
     public abstract void reset();
 
     /**
+     * Whether the render view remains attached after reset.
+     */
+    public boolean keepRenderViewOnReset() {
+        return false;
+    }
+
+    /**
      * 是否正在播放
      */
     public abstract boolean isPlaying();

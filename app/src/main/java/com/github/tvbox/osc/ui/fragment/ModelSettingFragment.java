@@ -753,6 +753,7 @@ public class ModelSettingFragment extends BaseLazyFragment {
                 boolean open = !DanmuHelper.isOpen();
                 DanmuHelper.setOpen(open);
                 tvDanmuOpenText.setText(open ? "开启" : "关闭");
+                EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_SET_DANMU_SETTINGS, open));
             }
         });
         findViewById(R.id.danmuApi).setOnClickListener(new View.OnClickListener() {

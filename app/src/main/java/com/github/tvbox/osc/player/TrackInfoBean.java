@@ -9,4 +9,5 @@ public class TrackInfoBean {
     public int groupIndex;
     public int index;
     public boolean selected;
+    public boolean bitmapSubtitle;
 }

@@ -13,6 +13,7 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -20,6 +21,8 @@ import java.util.zip.ZipFile;
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+
+import dalvik.system.DexClassLoader;
 
 class ProtectedInitJar {
 
@@ -41,16 +44,51 @@ class ProtectedInitJar {
     }
 
     void init(Class<?> clz) {
+        Object init = null;
         try {
             Method get = clz.getMethod("get");
-            Object init = get.invoke(null);
+            init = get.invoke(null);
+        } catch (Throwable ignored) {
+        }
+        bindContext(clz, init);
+        bindDexLoader(clz, init);
+        invokeNoArg(clz, "replaceCloudDiskNames");
+        invokeStartGoProxy(clz);
+    }
+
+    private void bindContext(Class<?> clz, Object init) {
+        if (init == null) return;
+        try {
             Field context = clz.getDeclaredField("c");
             context.setAccessible(true);
             context.set(init, App.getInstance());
+            return;
         } catch (Throwable ignored) {
         }
-        invokeNoArg(clz, "replaceCloudDiskNames");
-        invokeStartGoProxy(clz);
+        for (Field field : clz.getDeclaredFields()) {
+            try {
+                if (Modifier.isStatic(field.getModifiers()) || !Context.class.isAssignableFrom(field.getType())) continue;
+                field.setAccessible(true);
+                field.set(init, App.getInstance());
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private void bindDexLoader(Class<?> clz, Object init) {
+        if (init == null) return;
+        try {
+            Class<?> nativeClass = clz.getClassLoader().loadClass("com.github.catvod.spider.DexNative");
+            Method getLoader = nativeClass.getMethod("getLoader", Object.class);
+            Object loader = getLoader.invoke(null, App.getInstance());
+            if (!(loader instanceof DexClassLoader)) return;
+            for (Field field : clz.getDeclaredFields()) {
+                if (Modifier.isStatic(field.getModifiers()) || !DexClassLoader.class.isAssignableFrom(field.getType())) continue;
+                field.setAccessible(true);
+                field.set(init, loader);
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     private void invokeNoArg(Class<?> clz, String methodName) {

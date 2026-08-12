@@ -90,9 +90,7 @@
                     android:layout_marginLeft="@dimen/vs_40"
                     android:layout_marginRight="@dimen/vs_40"
                     android:text="16"
-                    android:textStyle="bold"
-                    android:textColor="@color/dialog_text_primary"
-                    android:textSize="@dimen/ts_40" />
+                    android:textSize="@dimen/ts_26" />
 
                 <TextView
                     android:id="@+id/subtitleSizePlus"
@@ -134,14 +132,15 @@
                     android:textSize="@dimen/ts_20" />
 
                 <TextView
+                    android:id="@+id/subtitlePositionText"
                     android:layout_width="@dimen/vs_120"
                     android:layout_height="@dimen/vs_60"
                     android:layout_gravity="center"
                     android:gravity="center"
                     android:layout_marginLeft="@dimen/vs_40"
                     android:layout_marginRight="@dimen/vs_40"
-                    android:text=""
-                    android:textSize="@dimen/ts_40" />
+                    android:text="0%"
+                    android:textSize="@dimen/ts_26" />
 
                 <TextView
                     android:id="@+id/subtitleStyleTwo"
@@ -172,6 +171,7 @@
                 android:layout_height="@dimen/vs_40">
 
                 <TextView
+                    android:id="@+id/subtitleTimeHint"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:layout_gravity="center"
@@ -211,9 +211,7 @@
                     android:layout_marginLeft="@dimen/vs_40"
                     android:layout_marginRight="@dimen/vs_40"
                     android:text="0"
-                    android:textStyle="bold"
-                    android:textColor="@color/dialog_text_primary"
-                    android:textSize="@dimen/ts_40" />
+                    android:textSize="@dimen/ts_26" />
 
                 <TextView
                     android:id="@+id/subtitleTimePlus"

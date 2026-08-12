@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -87,11 +88,11 @@ public class SubtitleViewModel extends ViewModel {
                                 Elements items = doc.select(".resultcard .sublist_box_title a.introtitle");
                                 List<Subtitle> data = new ArrayList<>();
                                 for (Element item : items) {
-                                    String title = item.attr("title");
+                                    String subtitleTitle = item.attr("title");
                                     String href = item.attr("href");
-                                    if (TextUtils.isEmpty(href)) continue;
+                                    if (TextUtils.isEmpty(href) || !containsSearchWord(subtitleTitle, title)) continue;
                                     Subtitle one = new Subtitle();
-                                    one.setName(title);
+                                    one.setName(subtitleTitle);
                                     one.setUrl("https://assrt.net" + href);
                                     one.setIsZip(true);
                                     data.add(one);
@@ -144,10 +145,12 @@ public class SubtitleViewModel extends ViewModel {
                                 if (TextUtils.isEmpty(onclick)) continue;
                                 Matcher matcher = regexShooterFileOnclick.matcher(onclick);
                                 if (matcher.find()) {
+                                    String fileName = matcher.group(3);
+                                    if (!isSupportedSubtitleFile(fileName)) continue;
                                     String url = String.format("https://secure.assrt.net/download/%s/-/%s/%s", matcher.group(1), matcher.group(2), matcher.group(3));
                                     Subtitle one = new Subtitle();
                                     Element name = item.selectFirst("#filelist-name");
-                                    one.setName(name == null ? matcher.group(3) : name.text());
+                                    one.setName(name == null ? fileName : name.text());
                                     one.setUrl(url);
                                     one.setIsZip(false);
                                     data.add(one);
@@ -156,10 +159,16 @@ public class SubtitleViewModel extends ViewModel {
                             setSearchListData(data, true, false);
                         } else {//有的字幕 不一定是压缩包
                             Element item = doc.selectFirst(".download a#btn_download");
+                            if (item == null) {
+                                setSearchListData(null, true, false);
+                                return;
+                            }
                             String href = item.attr("href");
-                            if (TextUtils.isEmpty(href)) setSearchListData(null, true, false);
-                            String h2 = href.toLowerCase();
-                            if (h2.endsWith("srt") || h2.endsWith("ass") || h2.endsWith("scc") || h2.endsWith("ttml")) {
+                            if (TextUtils.isEmpty(href)) {
+                                setSearchListData(null, true, false);
+                                return;
+                            }
+                            if (isSupportedSubtitleFile(href)) {
                                 String url = "https://assrt.net" + href;
                                 Subtitle one = new Subtitle();
                                 String title = href.substring(href.lastIndexOf("/") + 1);
@@ -191,6 +200,20 @@ public class SubtitleViewModel extends ViewModel {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private boolean containsSearchWord(String subtitleTitle, String searchWord) {
+        if (TextUtils.isEmpty(subtitleTitle) || TextUtils.isEmpty(searchWord)) return false;
+        return subtitleTitle.toLowerCase(Locale.ROOT).contains(searchWord.toLowerCase(Locale.ROOT));
+    }
+
+    private boolean isSupportedSubtitleFile(String fileName) {
+        if (TextUtils.isEmpty(fileName)) return false;
+        String lower = fileName.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".srt")
+                || lower.endsWith(".ass")
+                || lower.endsWith(".stl")
+                || lower.endsWith(".ttml");
     }
 
     private void getSubtitleUrlFromAssrt(Subtitle subtitle, SearchSubtitleDialog.SubtitleLoader subtitleLoader) {

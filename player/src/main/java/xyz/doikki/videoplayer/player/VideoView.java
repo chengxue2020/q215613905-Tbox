@@ -289,10 +289,17 @@ public class VideoView<P extends AbstractPlayer> extends FrameLayout
      * 开始准备播放（直接播放）
      */
     protected void startPrepare(boolean reset) {
+        startPrepare(reset, false);
+    }
+
+    protected void startPrepare(boolean reset, boolean rebindRenderView) {
         if (reset) {
             mMediaPlayer.reset();
             //重新设置option，media player reset之后，option会失效
             setOptions();
+            if (rebindRenderView && mRenderView != null) {
+                mRenderView.attachToPlayer(mMediaPlayer);
+            }
         }
         if (prepareDataSource()) {
             mMediaPlayer.prepareAsync();
@@ -484,8 +491,18 @@ public class VideoView<P extends AbstractPlayer> extends FrameLayout
         if (resetPosition) {
             mCurrentPosition = 0;
         }
-        addDisplay();
-        startPrepare(true);
+        if (mMediaPlayer == null) {
+            start();
+            return;
+        }
+        if (mMediaPlayer.keepRenderViewOnReset()) {
+            mMediaPlayer.reset();
+            setOptions();
+            mMediaPlayer.setOptions();
+            startPrepare(false);
+        } else {
+            startPrepare(true, true);
+        }
     }
 
     /**

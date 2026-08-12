@@ -15,11 +15,9 @@ import xyz.doikki.videoplayer.player.VideoView;
 public class LivePlayerManager {
     JSONObject defaultPlayerConfig = new JSONObject();
     JSONObject currentPlayerConfig;
-    private String currentApi="";
 
     public void init(VideoView videoView) {
         try {
-            currentApi=Hawk.get(HawkConfig.LIVE_API_URL,"");
             defaultPlayerConfig.put("pl", Hawk.get(HawkConfig.LIVE_PLAY_TYPE, Hawk.get(HawkConfig.PLAY_TYPE, 0)));
             defaultPlayerConfig.put("ijk", Hawk.get(HawkConfig.IJK_CODEC, "硬解码"));
             defaultPlayerConfig.put("pr", Hawk.get(HawkConfig.PLAY_RENDER, 0));
@@ -37,44 +35,6 @@ public class LivePlayerManager {
         } catch (JSONException e) {
             e.printStackTrace();
         }
-    }
-
-    public void getLiveChannelPlayer(VideoView videoView, String channelName) {
-        channelName=currentCfgKey(channelName);
-        JSONObject playerConfig = Hawk.get(channelName, null);
-        if (playerConfig == null) {
-            try {
-                defaultPlayerConfig.put("sc", Hawk.get(HawkConfig.LIVE_PLAY_SCALE, 0));
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-            if (!currentPlayerConfig.toString().equals(defaultPlayerConfig.toString()))
-                getDefaultLiveChannelPlayer(videoView);
-            else
-                videoView.setScreenScaleType(Hawk.get(HawkConfig.LIVE_PLAY_SCALE, 0));
-            return;
-        }
-        try {
-            playerConfig.put("sc", Hawk.get(HawkConfig.LIVE_PLAY_SCALE, 0));
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-        if (playerConfig.toString().equals(currentPlayerConfig.toString()))
-            return;
-
-        try {
-            if (playerConfig.getInt("pl") == currentPlayerConfig.getInt("pl")
-                    && playerConfig.getInt("pr") == currentPlayerConfig.getInt("pr")
-                    && playerConfig.getString("ijk").equals(currentPlayerConfig.getString("ijk"))) {
-                videoView.setScreenScaleType(playerConfig.getInt("sc"));
-            } else {
-                PlayerHelper.updateCfg(videoView, playerConfig);
-            }
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-
-        currentPlayerConfig = playerConfig;
     }
 
     public int getLivePlayerType() {
@@ -111,8 +71,7 @@ public class LivePlayerManager {
         return 0;
     }
 
-    public void changeLivePlayerType(VideoView videoView, int playerType, String channelName) {
-        channelName=currentCfgKey(channelName);
+    public void changeLivePlayerType(VideoView videoView, int playerType) {
         JSONObject playerConfig = currentPlayerConfig;
         try {
             switch (playerType) {
@@ -138,16 +97,19 @@ public class LivePlayerManager {
         }
         PlayerHelper.updateCfg(videoView, playerConfig);
 
-        if (playerConfig.toString().equals(defaultPlayerConfig.toString()))
-            Hawk.delete(channelName);
-        else
-            Hawk.put(channelName, playerConfig);
+        try {
+            defaultPlayerConfig.put("pl", playerConfig.getInt("pl"));
+            defaultPlayerConfig.put("ijk", playerConfig.getString("ijk"));
+            Hawk.put(HawkConfig.LIVE_PLAY_TYPE, playerConfig.getInt("pl"));
+            Hawk.put(HawkConfig.IJK_CODEC, playerConfig.getString("ijk"));
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
 
         currentPlayerConfig = playerConfig;
     }
 
-    public boolean switchLivePlayer(VideoView videoView, String channelName) {
-        channelName = currentCfgKey(channelName);
+    public boolean switchLivePlayer(VideoView videoView) {
         JSONObject playerConfig = currentPlayerConfig;
         if (playerConfig == null) {
             LOG.i("echo-liveSwitchPlayer: skip empty player config");
@@ -168,16 +130,11 @@ public class LivePlayerManager {
         }
         PlayerHelper.updateCfg(videoView, playerConfig);
 
-        if (playerConfig.toString().equals(defaultPlayerConfig.toString()))
-            Hawk.delete(channelName);
-        else
-            Hawk.put(channelName, playerConfig);
-
         currentPlayerConfig = playerConfig;
         return true;
     }
 
-    public void changeLivePlayerScale(@NonNull VideoView videoView, int playerScale, String channelName){
+    public void changeLivePlayerScale(@NonNull VideoView videoView, int playerScale){
         videoView.setScreenScaleType(playerScale);
         Hawk.put(HawkConfig.LIVE_PLAY_SCALE, playerScale);
 
@@ -190,10 +147,5 @@ public class LivePlayerManager {
         }
 
         currentPlayerConfig = playerConfig;
-    }
-
-    private String currentCfgKey(String channelName)
-    {
-        return currentApi+"_"+channelName;
     }
 }

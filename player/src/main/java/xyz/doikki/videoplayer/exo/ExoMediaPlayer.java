@@ -155,10 +155,14 @@ public class ExoMediaPlayer extends AbstractPlayer implements Player.Listener {
         if (mInternalPlayer != null) {
             mInternalPlayer.stop();
             mInternalPlayer.clearMediaItems();
-            mInternalPlayer.setVideoSurface(null);
             mIsPreparing = false;
             mRetriedAsHls = false;
         }
+    }
+
+    @Override
+    public boolean keepRenderViewOnReset() {
+        return true;
     }
 
     @Override

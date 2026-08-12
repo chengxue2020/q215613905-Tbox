@@ -1800,13 +1800,13 @@ public class LivePlayActivity extends BaseActivity {
             return false;
         }
         boolean showPreviousFrame = currentLiveChannelItem != null && mVideoView != null && mVideoView.isPlaying();
+        int previousLivePlayerType = livePlayerManager.getLivePlayerType();
         allowLiveSwitchPlayer = true;
         if (!changeSource) {
             currentChannelGroupIndex = channelGroupIndex;
             currentLiveChannelIndex = liveChannelIndex;
             currentLiveChannelItem = getLiveChannels(currentChannelGroupIndex).get(currentLiveChannelIndex);
             Hawk.put(HawkConfig.LIVE_CHANNEL, currentLiveChannelItem.getChannelName());
-            livePlayerManager.getLiveChannelPlayer(mVideoView, currentLiveChannelItem.getChannelName());
         }
 
         channel_Name = currentLiveChannelItem;
@@ -1825,18 +1825,33 @@ public class LivePlayActivity extends BaseActivity {
         ll_right_top_huikan.setVisibility(View.GONE);
         if(mVideoView!=null){
             if(liveChannelHeader()!=null)LOG.i("echo-"+liveChannelHeader().toString());
-            if (showPreviousFrame) {
+            boolean reusePlayer = canReusePlayer(previousLivePlayerType);
+            boolean keepExoFrame = reusePlayer && previousLivePlayerType == 3;
+            if (showPreviousFrame && !keepExoFrame) {
                 showSwitchChannelSnapshot();
             } else {
                 hideSwitchChannelSnapshot();
             }
-            mVideoView.release();
-            mVideoView.setUrl(currentLiveChannelItem.getUrl(),liveChannelHeader());
-            mVideoView.start();
+            String liveUrl = currentLiveChannelItem.getUrl();
+            if (reusePlayer) {
+                mVideoView.setUrl(liveUrl, liveChannelHeader());
+                mVideoView.replay(true);
+            } else {
+                mVideoView.release();
+                mVideoView.setUrl(liveUrl,liveChannelHeader());
+                mVideoView.start();
+            }
             showResolutionAfterChannelSwitch();
         }
         loadEpgAfterChannelStarted();
         return true;
+    }
+
+    private boolean canReusePlayer(int previousLivePlayerType) {
+        int currentLivePlayerType = livePlayerManager.getLivePlayerType();
+        return mVideoView != null
+                && mVideoView.getCurrentPlayState() != VideoView.STATE_IDLE
+                && previousLivePlayerType == currentLivePlayerType;
     }
 
     private void loadEpgAfterChannelStarted() {
@@ -2308,7 +2323,7 @@ public class LivePlayActivity extends BaseActivity {
         }
         mHandler.removeCallbacks(mConnectTimeoutChangeSourceRun);
         mVideoView.release();
-        if (!livePlayerManager.switchLivePlayer(mVideoView, currentLiveChannelItem.getChannelName())) {
+        if (!livePlayerManager.switchLivePlayer(mVideoView)) {
             allowLiveSwitchPlayer = false;
             return false;
         }
@@ -2618,11 +2633,11 @@ public class LivePlayActivity extends BaseActivity {
                 playChannel(currentChannelGroupIndex, currentLiveChannelIndex,true);
                 break;
             case 1://画面比例
-                livePlayerManager.changeLivePlayerScale(mVideoView, position, currentLiveChannelItem.getChannelName());
+                livePlayerManager.changeLivePlayerScale(mVideoView, position);
                 break;
             case 2://播放解码
                 mVideoView.release();
-                livePlayerManager.changeLivePlayerType(mVideoView, position, currentLiveChannelItem.getChannelName());
+                livePlayerManager.changeLivePlayerType(mVideoView, position);
                 mVideoView.setUrl(currentLiveChannelItem.getUrl(),liveChannelHeader());
                 mVideoView.start();
                 break;

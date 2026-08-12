@@ -8,6 +8,7 @@ import androidx.annotation.NonNull;
 import androidx.collection.ArrayMap;
 
 import com.github.catvod.net.OkHttp;
+import com.github.tvbox.osc.bean.DanmuSearchResult;
 import com.github.tvbox.osc.util.DanmuHelper;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.LOG;
@@ -19,6 +20,8 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -43,6 +46,18 @@ public class DanmakuApi {
 
         default void onNotFound() {
         }
+    }
+
+    public interface SearchListCallback {
+        void onSuccess(List<DanmuSearchResult> results);
+
+        void onError(String message);
+    }
+
+    public interface SearchResultCallback {
+        void onSuccess(String danmu);
+
+        void onError(String message);
     }
 
     public static boolean canSearch() {
@@ -124,9 +139,106 @@ public class DanmakuApi {
         }
     }
 
+    public static void searchList(String name, String episode, SearchListCallback callback) {
+        if (callback == null) return;
+        OkHttp.cancel(TAG);
+        int seq = searchSeq.incrementAndGet();
+        String apiUrl = getApiUrl();
+        if (TextUtils.isEmpty(apiUrl)) {
+            notifySearchListError(callback, seq, "弹幕搜索接口为空");
+            return;
+        }
+        if (!hasPlaceholder(apiUrl) && !isDanmakuSearchApi(apiUrl)) {
+            searchBuiltinList(apiUrl, name, callback, seq);
+            return;
+        }
+        try {
+            newCall(apiUrl, name, episode).enqueue(new Callback() {
+                @Override
+                public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                    notifySearchListError(callback, seq, getErrorMessage(e));
+                }
+
+                @Override
+                public void onResponse(@NonNull Call call, @NonNull Response response) {
+                    try {
+                        if (!response.isSuccessful()) throw new IOException("HTTP " + response.code());
+                        String body = response.body() == null ? "" : response.body().string();
+                        notifySearchListSuccess(callback, seq, parseSearchList(body));
+                    } catch (Throwable th) {
+                        notifySearchListError(callback, seq, getErrorMessage(th));
+                    } finally {
+                        response.close();
+                    }
+                }
+            });
+        } catch (Throwable th) {
+            notifySearchListError(callback, seq, getErrorMessage(th));
+        }
+    }
+
+    public static void loadSearchResult(DanmuSearchResult result, SearchResultCallback callback) {
+        if (callback == null) return;
+        OkHttp.cancel(TAG);
+        int seq = searchSeq.incrementAndGet();
+        if (result == null || TextUtils.isEmpty(result.getUrl())) {
+            notifySearchResultError(callback, seq, "弹幕地址为空");
+            return;
+        }
+        if (!result.isBuiltIn()) {
+            notifySearchResultSuccess(callback, seq, result.getUrl());
+            return;
+        }
+        OkHttp.newCall(OkHttp.client(BUILTIN_TIMEOUT), result.getUrl(), TAG).enqueue(new Callback() {
+            @Override
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                notifySearchResultError(callback, seq, getErrorMessage(e));
+            }
+
+            @Override
+            public void onResponse(@NonNull Call call, @NonNull Response response) {
+                try {
+                    if (!response.isSuccessful()) throw new IOException("HTTP " + response.code());
+                    String body = response.body() == null ? "" : response.body().string();
+                    String danmu = commentJsonToXml(body);
+                    if (TextUtils.isEmpty(danmu)) throw new IOException("未获取到弹幕内容");
+                    notifySearchResultSuccess(callback, seq, danmu);
+                } catch (Throwable th) {
+                    notifySearchResultError(callback, seq, getErrorMessage(th));
+                } finally {
+                    response.close();
+                }
+            }
+        });
+    }
+
     public static void cancel() {
         searchSeq.incrementAndGet();
         OkHttp.cancel(TAG);
+    }
+
+    private static void searchBuiltinList(String apiUrl, String name, SearchListCallback callback, int seq) {
+        String baseUrl = normalizeBaseUrl(apiUrl);
+        String searchUrl = baseUrl + "/api/v2/search/episodes?anime=" + encode(Trans.t2s(name == null ? "" : name));
+        OkHttp.newCall(OkHttp.client(BUILTIN_TIMEOUT), searchUrl, TAG).enqueue(new Callback() {
+            @Override
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                notifySearchListError(callback, seq, getErrorMessage(e));
+            }
+
+            @Override
+            public void onResponse(@NonNull Call call, @NonNull Response response) {
+                try {
+                    if (!response.isSuccessful()) throw new IOException("HTTP " + response.code());
+                    String body = response.body() == null ? "" : response.body().string();
+                    notifySearchListSuccess(callback, seq, parseBuiltinSearchList(body, baseUrl));
+                } catch (Throwable th) {
+                    notifySearchListError(callback, seq, getErrorMessage(th));
+                } finally {
+                    response.close();
+                }
+            }
+        });
     }
 
     private static void searchBuiltin(String apiUrl, String name, String episode, SearchCallback callback, int retry, int seq) {
@@ -627,6 +739,123 @@ public class DanmakuApi {
 
     private static String safeLog(String text) {
         return TextUtils.isEmpty(text) ? "" : text;
+    }
+
+    private static List<DanmuSearchResult> parseSearchList(String body) throws Exception {
+        List<DanmuSearchResult> results = new ArrayList<>();
+        if (TextUtils.isEmpty(body)) return results;
+        String text = body.trim();
+        if (text.startsWith("[")) {
+            appendSearchResults(results, new JSONArray(text));
+            return results;
+        }
+        if (!text.startsWith("{")) return results;
+        JSONObject object = new JSONObject(text);
+        JSONArray items = object.optJSONArray("data");
+        if (items == null) items = object.optJSONArray("list");
+        if (items == null) items = object.optJSONArray("results");
+        if (items != null) {
+            appendSearchResults(results, items);
+            return results;
+        }
+        String url = object.optString("url", "").trim();
+        if (!TextUtils.isEmpty(url)) {
+            results.add(new DanmuSearchResult(firstString(object, "name", "title"), url, false));
+        }
+        return results;
+    }
+
+    private static void appendSearchResults(List<DanmuSearchResult> results, JSONArray items) {
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject item = items.optJSONObject(i);
+            if (item == null) continue;
+            String url = item.optString("url", "").trim();
+            if (TextUtils.isEmpty(url)) continue;
+            String name = firstString(item, "name", "title", "episode", "vod_name");
+            results.add(new DanmuSearchResult(name, url, false));
+        }
+    }
+
+    private static List<DanmuSearchResult> parseBuiltinSearchList(String body, String baseUrl) throws Exception {
+        List<DanmuSearchResult> results = new ArrayList<>();
+        JSONObject object = new JSONObject(body);
+        appendBuiltinResults(results, baseUrl, object, "");
+        JSONObject bangumi = object.optJSONObject("bangumi");
+        if (bangumi != null) appendBuiltinResults(results, baseUrl, bangumi, firstString(bangumi, "animeTitle", "title", "name"));
+        appendBuiltinAnimeResults(results, baseUrl, object.optJSONArray("animes"));
+        appendBuiltinAnimeResults(results, baseUrl, object.optJSONArray("anime"));
+        appendBuiltinAnimeResults(results, baseUrl, object.optJSONArray("data"));
+        return results;
+    }
+
+    private static void appendBuiltinAnimeResults(List<DanmuSearchResult> results, String baseUrl, JSONArray animes) {
+        if (animes == null) return;
+        for (int i = 0; i < animes.length(); i++) {
+            JSONObject anime = animes.optJSONObject(i);
+            if (anime == null) continue;
+            appendBuiltinResults(results, baseUrl, anime, firstString(anime, "animeTitle", "title", "name"));
+            JSONObject bangumi = anime.optJSONObject("bangumi");
+            if (bangumi != null) {
+                appendBuiltinResults(results, baseUrl, bangumi, firstString(anime, "animeTitle", "title", "name"));
+            }
+        }
+    }
+
+    private static void appendBuiltinResults(List<DanmuSearchResult> results, String baseUrl, JSONObject object, String animeName) {
+        JSONArray episodes = object.optJSONArray("episodes");
+        if (episodes == null) return;
+        for (int i = 0; i < episodes.length(); i++) {
+            JSONObject episode = episodes.optJSONObject(i);
+            if (episode == null) continue;
+            String id = firstString(episode, "episodeId", "id");
+            if (TextUtils.isEmpty(id)) continue;
+            String episodeName = firstString(episode, "episodeTitle", "title", "name");
+            String name = TextUtils.isEmpty(animeName) ? episodeName : animeName + " " + episodeName;
+            if (TextUtils.isEmpty(name)) name = id;
+            String url = baseUrl + "/api/v2/comment/" + id + "?format=json";
+            results.add(new DanmuSearchResult(name, url, true));
+        }
+    }
+
+    private static void notifySearchListSuccess(SearchListCallback callback, int seq, List<DanmuSearchResult> results) {
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (isCurrentSearch(seq)) callback.onSuccess(results);
+            }
+        });
+    }
+
+    private static void notifySearchListError(SearchListCallback callback, int seq, String message) {
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (isCurrentSearch(seq)) callback.onError(message);
+            }
+        });
+    }
+
+    private static void notifySearchResultSuccess(SearchResultCallback callback, int seq, String danmu) {
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (isCurrentSearch(seq)) callback.onSuccess(danmu);
+            }
+        });
+    }
+
+    private static void notifySearchResultError(SearchResultCallback callback, int seq, String message) {
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (isCurrentSearch(seq)) callback.onError(message);
+            }
+        });
+    }
+
+    private static String getErrorMessage(Throwable th) {
+        String message = th == null ? "" : th.getMessage();
+        return TextUtils.isEmpty(message) ? "弹幕搜索失败" : message;
     }
 
     private static class EpisodeList {

@@ -27,6 +27,9 @@ public class SubtitleDialog extends BaseDialog {
     private TextView subtitleTimePlus;
     private TextView subtitleStyleOne;
     private TextView subtitleStyleTwo;
+    private TextView subtitlePositionText;
+    private TextView subtitleTimeHint;
+    private boolean exoInternalSubtitle;
 
     private SearchSubtitleListener mSearchSubtitleListener;
     private LocalFileChooserListener mLocalFileChooserListener;
@@ -53,6 +56,8 @@ public class SubtitleDialog extends BaseDialog {
         subtitleTimePlus = findViewById(R.id.subtitleTimePlus);
         subtitleStyleOne = findViewById(R.id.subtitleStyleOne);
         subtitleStyleTwo = findViewById(R.id.subtitleStyleTwo);
+        subtitlePositionText = findViewById(R.id.subtitlePositionText);
+        subtitleTimeHint = findViewById(R.id.subtitleTimeHint);
 
         selectLocal.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -78,6 +83,13 @@ public class SubtitleDialog extends BaseDialog {
         subtitleSizeMinus.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                if (exoInternalSubtitle) {
+                    int scale = Math.max(50, SubtitleHelper.getExoSubtitleScale() - 5);
+                    subtitleSizeText.setText(scale + "%");
+                    SubtitleHelper.setExoSubtitleScale(scale);
+                    mSubtitleViewListener.setSubtitleScale(scale);
+                    return;
+                }
                 String sizeStr = subtitleSizeText.getText().toString();
                 int curSize = Integer.parseInt(sizeStr);
                 curSize -= 2;
@@ -92,6 +104,13 @@ public class SubtitleDialog extends BaseDialog {
         subtitleSizePlus.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                if (exoInternalSubtitle) {
+                    int scale = Math.min(200, SubtitleHelper.getExoSubtitleScale() + 5);
+                    subtitleSizeText.setText(scale + "%");
+                    SubtitleHelper.setExoSubtitleScale(scale);
+                    mSubtitleViewListener.setSubtitleScale(scale);
+                    return;
+                }
                 String sizeStr = subtitleSizeText.getText().toString();
                 int curSize = Integer.parseInt(sizeStr);
                 curSize += 2;
@@ -162,6 +181,13 @@ public class SubtitleDialog extends BaseDialog {
         subtitleStyleOne.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                if (exoInternalSubtitle) {
+                    float position = Math.min(80.0f, SubtitleHelper.getExoSubtitlePosition() + 0.5f);
+                    SubtitleHelper.setExoSubtitlePosition(position);
+                    subtitlePositionText.setText(position == 0.0f ? "0" : position + "%");
+                    mSubtitleViewListener.moveSubtitle(position);
+                    return;
+                }
                 int style = 0;
                 dismiss();
                 mSubtitleViewListener.setTextStyle(style);
@@ -172,12 +198,39 @@ public class SubtitleDialog extends BaseDialog {
         subtitleStyleTwo.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                if (exoInternalSubtitle) {
+                    float position = Math.max(-80.0f, SubtitleHelper.getExoSubtitlePosition() - 0.5f);
+                    SubtitleHelper.setExoSubtitlePosition(position);
+                    subtitlePositionText.setText(position == 0.0f ? "0" : position + "%");
+                    mSubtitleViewListener.moveSubtitle(position);
+                    return;
+                }
                 int style = 1;
                 dismiss();
                 mSubtitleViewListener.setTextStyle(style);
                 Toast.makeText(getContext(), "设置样式成功", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    public void setExoInternalSubtitle(boolean exoInternalSubtitle) {
+        this.exoInternalSubtitle = exoInternalSubtitle;
+        if (exoInternalSubtitle) {
+            subtitleSizeText.setText(SubtitleHelper.getExoSubtitleScale() + "%");
+            subtitleStyleOne.setText("字幕上移");
+            subtitleStyleTwo.setText("字幕下移");
+            subtitleStyleTwo.setTextColor(getContext().getResources().getColor(R.color.dialog_text_primary));
+            float position = SubtitleHelper.getExoSubtitlePosition();
+            subtitlePositionText.setText(position == 0.0f ? "0" : position + "%");
+            subtitleTimeHint.setText("字幕延时对内置字幕有效");
+        } else {
+            subtitleSizeText.setText(Integer.toString(SubtitleHelper.getTextSize(getOwnerActivity())));
+            subtitleStyleOne.setText("字幕样式一");
+            subtitleStyleTwo.setText("字幕样式二");
+            subtitleStyleTwo.setTextColor(getContext().getResources().getColor(R.color.color_FFB6C1));
+            subtitlePositionText.setText("");
+            subtitleTimeHint.setText("字幕延时仅对外挂字幕有效");
+        }
     }
 
     public void setLocalFileChooserListener(LocalFileChooserListener localFileChooserListener) {
@@ -205,5 +258,7 @@ public class SubtitleDialog extends BaseDialog {
         void setSubtitleDelay(int milliseconds);
         void selectInternalSubtitle();
         void setTextStyle(int style);
+        void setSubtitleScale(int scale);
+        void moveSubtitle(float offset);
     }
 }

@@ -21,6 +21,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import tv.danmaku.ijk.media.player.IMediaPlayer;
+import tv.danmaku.ijk.media.player.IjkMediaMeta;
+import tv.danmaku.ijk.media.player.misc.IMediaFormat;
 import tv.danmaku.ijk.media.player.misc.ITrackInfo;
 import tv.danmaku.ijk.media.player.misc.IjkTrackInfo;
 import xyz.doikki.videoplayer.exo.ExoMediaSourceHelper;
@@ -217,9 +219,26 @@ public class IjkMediaPlayer extends IjkPlayer {
         TrackInfo data = new TrackInfo();
         int subtitleSelected = mMediaPlayer.getSelectedTrack(ITrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT);
         int audioSelected = mMediaPlayer.getSelectedTrack(ITrackInfo.MEDIA_TRACK_TYPE_AUDIO);
+        int videoSelected = mMediaPlayer.getSelectedTrack(ITrackInfo.MEDIA_TRACK_TYPE_VIDEO);
         int index = 0;
         for (IjkTrackInfo info : trackInfo) {
-            if (info.getTrackType() == ITrackInfo.MEDIA_TRACK_TYPE_AUDIO) {//音轨信息
+            if (info.getTrackType() == ITrackInfo.MEDIA_TRACK_TYPE_VIDEO) {
+                if (isAttachedPicture(info)) {
+                    LOG.i("echo-ijk-skip-attached-picture:" + info.getInfoInline());
+                    index++;
+                    continue;
+                }
+                TrackInfoBean v = new TrackInfoBean();
+                String name = processVideoName(info.getInfoInline());
+                String language = getFriendlyLanguage(info.getLanguage(), info.getInfoInline());
+                v.language = language;
+                v.name = buildDisplayName("视轨", data.getVideo().size() + 1, language, name);
+                v.trackId = index;
+                v.index = index;
+                v.selected = index == videoSelected;
+                data.addVideo(v);
+            }
+            else if (info.getTrackType() == ITrackInfo.MEDIA_TRACK_TYPE_AUDIO) {//音轨信息
                 TrackInfoBean a = new TrackInfoBean();
                 String name = processAudioName(info.getInfoInline());
                 a.language = info.getLanguage();
@@ -235,6 +254,11 @@ public class IjkMediaPlayer extends IjkPlayer {
                 data.addAudio(a);
             }
             else if (info.getTrackType() == ITrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT) {//内置字幕
+                if (!isTextSubtitle(info.getInfoInline())) {
+                    LOG.i("echo-ijk-skip-bitmap-subtitle:" + info.getInfoInline());
+                    index++;
+                    continue;
+                }
                 TrackInfoBean t = new TrackInfoBean();
                 t.name = info.getInfoInline();
                 t.language = info.getLanguage();
@@ -258,6 +282,37 @@ public class IjkMediaPlayer extends IjkPlayer {
                 .replace(" ", "")
                 .replaceAll("^,+|,+$", "")
                 .replace(",", " / ");
+    }
+
+    private String processVideoName(String rawName) {
+        if (rawName == null) return "";
+        return rawName.replace("VIDEO,", "")
+                .replace("N/A,", "")
+                .replace(" ", "")
+                .replaceAll("^,+|,+$", "")
+                .replace(",", " / ");
+    }
+
+    private boolean isAttachedPicture(IjkTrackInfo info) {
+        IMediaFormat format = info.getFormat();
+        if (format == null) return false;
+        String codecName = format.getString(IjkMediaMeta.IJKM_KEY_CODEC_NAME);
+        return "mjpeg".equalsIgnoreCase(codecName)
+                && format.getInteger(IjkMediaMeta.IJKM_KEY_BITRATE) <= 0
+                && format.getInteger(IjkMediaMeta.IJKM_KEY_FPS_NUM) <= 0;
+    }
+
+    private boolean isTextSubtitle(String rawName) {
+        String value = rawName == null ? "" : rawName.toLowerCase();
+        return !value.contains("pgs")
+                && !value.contains("hdmv")
+                && !value.contains("dvd subtitle")
+                && !value.contains("dvd_subtitle")
+                && !value.contains("dvb subtitle")
+                && !value.contains("dvb_subtitle")
+                && !value.contains("xsub")
+                && !value.contains("vobsub")
+                && !value.contains("bitmap");
     }
 
     private String getFriendlyLanguage(String language, String rawInfo) {
@@ -286,7 +341,7 @@ public class IjkMediaPlayer extends IjkPlayer {
     }
 
     private String buildDisplayName(String prefix, int number, String language, String detail) {
-        StringBuilder builder = new StringBuilder(prefix).append(" ").append(number);
+        StringBuilder builder = new StringBuilder(prefix).append(number);
         if (language != null && !language.isEmpty()) {
             builder.append(" - ").append(language);
         }

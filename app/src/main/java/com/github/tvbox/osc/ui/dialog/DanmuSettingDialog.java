@@ -10,6 +10,7 @@ import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.event.RefreshEvent;
 import com.github.tvbox.osc.ui.adapter.ButtonAdapter;
 import com.github.tvbox.osc.util.DanmuHelper;
+import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.owen.tvrecyclerview.widget.TvRecyclerView;
 import com.owen.tvrecyclerview.widget.V7LinearLayoutManager;
 
@@ -20,16 +21,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import master.flame.danmaku.ui.widget.DanmakuView;
-
 public class DanmuSettingDialog extends BaseDialog {
-    private final DanmakuView danmakuView;
+    private DanmuSearchListener danmuSearchListener;
 
-    public DanmuSettingDialog(@NonNull @NotNull Context context, DanmakuView danmakuView) {
+    public DanmuSettingDialog(@NonNull @NotNull Context context) {
         super(context);
         setContentView(R.layout.dialog_danmu_setting);
-        this.danmakuView = danmakuView;
-        initOnOff();
+        initDanmuSearch();
         initColor();
         initSpeed();
         initSize();
@@ -37,27 +35,15 @@ public class DanmuSettingDialog extends BaseDialog {
         initAlpha();
     }
 
-    private void initOnOff() {
-        List<Boolean> data = Arrays.asList(true, false);
-        setButtonAdapter(R.id.trv_onoff, data, DanmuHelper.isOpen() ? 0 : 1, new ButtonAdapter.SelectDialogInterface<Boolean>() {
-            @Override
-            public void click(Boolean value, int pos) {
-                DanmuHelper.setOpen(value);
-                if (danmakuView != null) {
-                    if (value) {
-                        danmakuView.show();
-                    } else {
-                        danmakuView.hide();
-                    }
-                }
-                EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_SET_DANMU_SETTINGS, value));
-            }
-
-            @Override
-            public String getDisplay(Boolean val) {
-                return val ? "开" : "关";
-            }
+    private void initDanmuSearch() {
+        TextView danmuSearch = findViewById(R.id.danmuSearch);
+        danmuSearch.setOnClickListener(v -> {
+            FastClickCheckUtil.check(v);
+            if (danmuSearchListener == null) return;
+            dismiss();
+            danmuSearchListener.openSearchDanmuDialog();
         });
+        danmuSearch.post(danmuSearch::requestFocus);
     }
 
     private void initColor() {
@@ -189,9 +175,13 @@ public class DanmuSettingDialog extends BaseDialog {
         tvRecyclerView.setLayoutManager(new V7LinearLayoutManager(getContext(), 0, false));
         tvRecyclerView.setAdapter(adapter);
         tvRecyclerView.setSelectedPosition(select);
-        tvRecyclerView.post(() -> {
-            tvRecyclerView.smoothScrollToPosition(select);
-            tvRecyclerView.setSelectionWithSmooth(select);
-        });
+    }
+
+    public void setDanmuSearchListener(DanmuSearchListener danmuSearchListener) {
+        this.danmuSearchListener = danmuSearchListener;
+    }
+
+    public interface DanmuSearchListener {
+        void openSearchDanmuDialog();
     }
 }
