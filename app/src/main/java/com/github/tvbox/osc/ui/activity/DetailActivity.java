@@ -795,9 +795,13 @@ public class DetailActivity extends BaseActivity {
     }
 
     private String removeHtmlTag(String info) {
-        if (info == null)
+        if (TextUtils.isEmpty(info))
             return "";
-        return info.replaceAll("\\<.*?\\>", "").replaceAll("\\s", "");
+        String text = info.replaceAll("\\[a=cr:(?:\\{.*?\\}|\\[.*?\\])\\/](.*?)\\[\\/a]", "$1");
+        text = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
+                ? Html.fromHtml(text, Html.FROM_HTML_MODE_LEGACY).toString()
+                : Html.fromHtml(text).toString();
+        return text.replaceAll("\\s", "");
     }
 
     private void applyPreviewRoundCorners() {
@@ -873,8 +877,8 @@ public class DetailActivity extends BaseActivity {
                     } else {
                     	setTextShow(tvType, "类型：", mVideo.type);
                     }
-                    setTextShow(tvActor, "演员：", mVideo.actor);
-                    setTextShow(tvDirector, "导演：", mVideo.director);
+                    setTextShow(tvActor, "演员：", removeHtmlTag(mVideo.actor));
+                    setTextShow(tvDirector, "导演：", removeHtmlTag(mVideo.director));
                     setTextShow(tvDes, "内容简介：", removeHtmlTag(mVideo.des));
                     if (!TextUtils.isEmpty(mVideo.pic)) {
                         com.github.tvbox.osc.util.ImgUtil.load(DefaultConfig.checkReplaceProxy(mVideo.pic), ivThumb, AutoSizeUtils.mm2px(mContext, 10), AutoSizeUtils.mm2px(mContext, 300), AutoSizeUtils.mm2px(mContext, 400), mVideo.name);
@@ -1786,6 +1790,10 @@ public class DetailActivity extends BaseActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event != null && !fullWindows && event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0 && event.getKeyCode() == KeyEvent.KEYCODE_MENU) {
+            startDetailFallbackFromMenu();
+            return true;
+        }
         if (event != null && playFragment != null && fullWindows) {
             if (playFragment.dispatchKeyEvent(event)) {
                 return true;

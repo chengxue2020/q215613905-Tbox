@@ -6,6 +6,7 @@ from importlib.machinery import SourceFileLoader  ### 导入这个模块
 from urllib import parse
 import json
 import sys
+import crypto_protocol_dh
 sys.dont_write_bytecode = True
 
 PLUGIN_DOWNLOAD_TIMEOUT = 20

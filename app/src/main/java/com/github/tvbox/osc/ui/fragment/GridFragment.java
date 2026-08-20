@@ -26,6 +26,7 @@ import com.github.tvbox.osc.bean.MovieSort;
 import com.github.tvbox.osc.event.RefreshEvent;
 import com.github.tvbox.osc.ui.activity.DetailActivity;
 import com.github.tvbox.osc.ui.activity.FastSearchActivity;
+import com.github.tvbox.osc.ui.activity.SearchActivity;
 import com.github.tvbox.osc.ui.adapter.GridAdapter;
 import com.github.tvbox.osc.ui.adapter.GridFilterKVAdapter;
 import com.github.tvbox.osc.ui.dialog.GridFilterDialog;
@@ -267,8 +268,16 @@ public class GridFragment extends BaseLazyFragment {
                         }
                     }
                     else{
-                        bundle.putString("picture", video.pic);
-                        jumpActivity(DetailActivity.class, bundle);
+                        if (video.id != null && video.id.startsWith("msearch:")) {
+                            if (Hawk.get(HawkConfig.FAST_SEARCH_MODE, true) && enableFastSearch()) {
+                                jumpActivity(FastSearchActivity.class, bundle);
+                            } else {
+                                jumpActivity(SearchActivity.class, bundle);
+                            }
+                        } else {
+                            bundle.putString("picture", video.pic);
+                            jumpActivity(DetailActivity.class, bundle);
+                        }
                     }
 
                 }
@@ -284,7 +293,12 @@ public class GridFragment extends BaseLazyFragment {
                     bundle.putString("id", video.id);
                     bundle.putString("sourceKey", video.sourceKey);
                     bundle.putString("title", video.name);
-                    jumpActivity(FastSearchActivity.class, bundle);
+                    if (video.id != null && video.id.startsWith("msearch:")) {
+                        bundle.putString("picture", video.pic);
+                        jumpActivity(DetailActivity.class, bundle);
+                    } else {
+                        jumpActivity(FastSearchActivity.class, bundle);
+                    }
                 }
                 return true;
             }

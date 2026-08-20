@@ -35,6 +35,7 @@
 			android:layout_gravity="center"
 			android:scaleX="0.75"
 			android:scaleY="0.75"
+			android:indeterminateDrawable="@drawable/anim_loading"
 			android:indeterminate="true" />
 	</FrameLayout>
 

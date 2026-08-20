@@ -610,6 +610,11 @@ public class FastSearchActivity extends BaseActivity {
         return matchNum == arr.length;
     }
 
+    private boolean isExactSearchResult(Movie.Video video) {
+        return video != null && !TextUtils.isEmpty(video.name) && !TextUtils.isEmpty(searchTitle)
+                && TextUtils.equals(video.name.trim(), searchTitle.trim());
+    }
+
     private void searchData(AbsXml absXml) {
         if (!isCurrentSearchResult(absXml)) {
             return;
@@ -625,11 +630,13 @@ public class FastSearchActivity extends BaseActivity {
             List<Movie.Video> data = new ArrayList<>();
             for (Movie.Video video : absXml.movie.videoList) {
                 if (!matchSearchResult(video.name, searchTitle)) continue;
-                data.add(video);
                 if (!resultVods.containsKey(video.sourceKey)) {
                     resultVods.put(video.sourceKey, new ArrayList<Movie.Video>());
                 }
                 resultVods.get(video.sourceKey).add(video);
+                if (isExactSearchResult(video)) {
+                    data.add(video);
+                }
                 if (!TextUtils.equals(video.sourceKey, lastSourceKey)) {
                     lastSourceKey = this.addWordAdapterIfNeed(video.sourceKey);
                 }

@@ -770,13 +770,7 @@ public class SearchActivity extends BaseActivity {
 
     private boolean matchSearchResult(String name, String searchTitle) {
         if (TextUtils.isEmpty(name) || TextUtils.isEmpty(searchTitle)) return false;
-        searchTitle = searchTitle.trim();
-        String[] arr = searchTitle.split("\\s+");
-        int matchNum = 0;
-        for(String one : arr) {
-            if (name.contains(one)) matchNum++;
-        }
-        return matchNum == arr.length ? true : false;
+        return TextUtils.equals(name.trim(), searchTitle.trim());
     }
 
     private void searchData(AbsXml absXml) {

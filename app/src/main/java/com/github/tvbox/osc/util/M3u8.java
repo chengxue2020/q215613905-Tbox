@@ -7,8 +7,10 @@ import com.google.android.exoplayer2.util.UriUtil;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,6 +42,9 @@ public class M3u8 {
         "adservice", "adserver", "adsystem", "doubleclick", "googlesyndication",
         "advertising", "2mdn.net", "moatads", "scorecardresearch", "quantserve"
     };
+
+    private static final int MAX_FRAME_RATE_AD_BLOCK_SIZE = 12;
+    private static final Map<Integer, Set<BigDecimal>> FRAME_RATE_FEATURES = prepareFrameRateFeatures();
 
     public static int currentAdCount;
 
@@ -229,8 +234,259 @@ public class M3u8 {
         String line = resolveContent(tsUrlPre, m3u8Content);
         List<String> ads = getRegex(tsUrlPre);
         if (ads != null && !ads.isEmpty()) line = clean(line, ads);
-        line = cleanCommonAdMarkers(tsUrlPre, line);
-        return cleanDiscontinuityGroups(tsUrlPre, line);
+        line = cleanCommonAdMarkers(line);
+        if (hasEndList(line) && line.contains(TAG_DISCONTINUITY)) {
+            line = cleanDecimalPrecisionGroups(line);
+            line = cleanFrameRateGroups(line);
+        }
+        return cleanDiscontinuityGroups(line);
+    }
+
+    /**
+     * 正片切片的 EXTINF 小数位数通常稳定，广告素材拼接后经常出现另一种精度。
+    * 只删除精度完全不同的短块，不处理块内混合精度，避免误删正常切片。
+    */
+    private static String cleanDecimalPrecisionGroups(String m3u8Content) {
+        List<Group> groups = buildDiscontinuityGroups(m3u8Content.split("\\n"));
+        if (groups.size() < 2) return m3u8Content;
+
+        Map<Integer, Integer> precisionCounts = new HashMap<>();
+        int totalSegments = 0;
+        for (Group group : groups) {
+            for (String raw : group.lines) {
+                int precision = getDecimalPrecision(raw);
+                if (precision < 0) continue;
+                totalSegments += 1;
+                Integer count = precisionCounts.get(precision);
+                precisionCounts.put(precision, count == null ? 1 : count + 1);
+            }
+        }
+        if (totalSegments < 8 || precisionCounts.size() < 2) return m3u8Content;
+
+        int majorPrecision = -1;
+        int majorCount = 0;
+        for (Map.Entry<Integer, Integer> entry : precisionCounts.entrySet()) {
+            if (entry.getValue() > majorCount) {
+                majorPrecision = entry.getKey();
+                majorCount = entry.getValue();
+            }
+        }
+        if (majorPrecision < 0 || majorCount * 1.0 / totalSegments < 0.7) return m3u8Content;
+
+        boolean[] removeGroups = new boolean[groups.size()];
+        int removableSegments = 0;
+        for (int i = 0; i < groups.size(); i++) {
+            Group group = groups.get(i);
+            if (i == groups.size() - 1 || group.segmentCount == 0 || group.segmentCount > MAX_FRAME_RATE_AD_BLOCK_SIZE) continue;
+
+            DecimalPrecisionStats stats = getDecimalPrecisionStats(group, majorPrecision);
+            if (stats.total > 0 && stats.mismatched == stats.total) {
+                removeGroups[i] = true;
+                removableSegments += group.segmentCount;
+            }
+        }
+
+        if (removableSegments == 0 || removableSegments > getAdSegmentLimit(m3u8Content)
+                || removableSegments > totalSegments * 0.3) return m3u8Content;
+
+        StringBuilder sb = new StringBuilder();
+        int removedBlocks = 0;
+        for (int i = 0; i < groups.size(); i++) {
+            if (removeGroups[i]) {
+                currentAdCount += groups.get(i).segmentCount;
+                removedBlocks += 1;
+            } else {
+                groups.get(i).appendTo(sb);
+            }
+        }
+        LOG.i("echo-fixAdM3u8 decimal precision detected: major=" + majorPrecision + ", blocks=" + removedBlocks + ", removed=" + removableSegments);
+        return normalizeMediaPlaylist(sb.toString());
+    }
+
+    private static DecimalPrecisionStats getDecimalPrecisionStats(Group group, int majorPrecision) {
+        DecimalPrecisionStats stats = new DecimalPrecisionStats();
+        for (String raw : group.lines) {
+            int precision = getDecimalPrecision(raw);
+            if (precision < 0) continue;
+            stats.total += 1;
+            if (precision != majorPrecision) stats.mismatched += 1;
+        }
+        return stats;
+    }
+
+    private static int getDecimalPrecision(String line) {
+        int start = getExtInfValueStart(line);
+        if (start < 0) return -1;
+        int end = getExtInfValueEnd(line, start);
+        int dot = line.indexOf('.', start);
+        return dot < 0 || dot >= end ? 0 : end - dot - 1;
+    }
+
+    /**
+     * 广告通常由不同素材拼接，切片时长的小数部分会呈现不同的帧率特征。
+    * 仅对点播播放列表中的短不连续块执行，避免影响直播和正常长片段。
+    */
+    private static String cleanFrameRateGroups(String m3u8Content) {
+        List<Group> groups = buildDiscontinuityGroups(m3u8Content.split("\\n"));
+        if (groups.size() < 2) return m3u8Content;
+
+        int masterFrameRate = findDominantFrameRate(groups);
+        if (masterFrameRate == 0) return m3u8Content;
+
+        int removableSegments = 0;
+        boolean[] removeGroups = new boolean[groups.size()];
+        for (int i = 0; i < groups.size(); i++) {
+            Group group = groups.get(i);
+            if (i == groups.size() - 1 || group.segmentCount == 0 || group.segmentCount > MAX_FRAME_RATE_AD_BLOCK_SIZE) continue;
+
+            FrameRateStats stats = getFrameRateStats(group, masterFrameRate);
+            if (stats.mismatched > 0 && stats.mismatched >= stats.matched) {
+                removeGroups[i] = true;
+                removableSegments += group.segmentCount;
+            }
+        }
+
+        int segmentLimit = getAdSegmentLimit(m3u8Content);
+        if (removableSegments == 0 || removableSegments > segmentLimit) return m3u8Content;
+
+        StringBuilder sb = new StringBuilder();
+        int removedBlocks = 0;
+        for (int i = 0; i < groups.size(); i++) {
+            if (removeGroups[i]) {
+                currentAdCount += groups.get(i).segmentCount;
+                removedBlocks += 1;
+            } else {
+                groups.get(i).appendTo(sb);
+            }
+        }
+        LOG.i("echo-fixAdM3u8 frame rate detected: master=" + masterFrameRate + ", blocks=" + removedBlocks + ", removed=" + removableSegments);
+        return normalizeMediaPlaylist(sb.toString());
+    }
+
+    private static int findDominantFrameRate(List<Group> groups) {
+        int count30 = 0;
+        int count25 = 0;
+        int count24 = 0;
+        for (Group group : groups) {
+            for (String raw : group.lines) {
+                if (getExtInfValueStart(raw) < 0) continue;
+                int frameRate = getExclusiveFrameRate(parseExtInfDuration(raw));
+                if (frameRate == 30) count30 += 1;
+                else if (frameRate == 25) count25 += 1;
+                else if (frameRate == 24) count24 += 1;
+            }
+        }
+
+        int max = Math.max(count30, Math.max(count25, count24));
+        if (max < 2) return 0;
+        if ((count30 == max ? 1 : 0) + (count25 == max ? 1 : 0) + (count24 == max ? 1 : 0) != 1) return 0;
+        return count30 == max ? 30 : (count25 == max ? 25 : 24);
+    }
+
+    private static FrameRateStats getFrameRateStats(Group group, int masterFrameRate) {
+        FrameRateStats stats = new FrameRateStats();
+        for (String raw : group.lines) {
+            if (getExtInfValueStart(raw) < 0) continue;
+            int frameRate = getExclusiveFrameRate(parseExtInfDuration(raw));
+            if (frameRate == masterFrameRate) stats.matched += 1;
+            else if (frameRate != 0) stats.mismatched += 1;
+        }
+        return stats;
+    }
+
+    private static int getExclusiveFrameRate(BigDecimal duration) {
+        boolean is30 = isFrameAligned(duration, 30);
+        boolean is25 = isFrameAligned(duration, 25);
+        boolean is24 = isFrameAligned(duration, 24);
+        if (is30 && !is25 && !is24) return 30;
+        if (is25 && !is30 && !is24) return 25;
+        if (is24 && !is30 && !is25) return 24;
+        return 0;
+    }
+
+    private static boolean isFrameAligned(BigDecimal duration, int frameRate) {
+        if (duration == null) return false;
+        Set<BigDecimal> features = FRAME_RATE_FEATURES.get(frameRate);
+        if (features == null) return false;
+        BigDecimal fraction = duration.remainder(BigDecimal.ONE).abs().stripTrailingZeros();
+        return features.contains(fraction);
+    }
+
+    private static Map<Integer, Set<BigDecimal>> prepareFrameRateFeatures() {
+        Map<Integer, Set<BigDecimal>> features = new HashMap<>();
+        features.put(30, createFrameRateFeatures(30, true));
+        features.put(25, createFrameRateFeatures(25, false));
+        features.put(24, createFrameRateFeatures(24, true));
+        return features;
+    }
+
+    private static Set<BigDecimal> createFrameRateFeatures(int frameRate, boolean includeNtsc) {
+        Set<BigDecimal> features = new HashSet<>();
+        addFrameRateFeatures(features, frameRate, frameRate);
+        if (includeNtsc) addFrameRateFeatures(features, frameRate / 1.001d, frameRate * 10);
+        return features;
+    }
+
+    private static void addFrameRateFeatures(Set<BigDecimal> features, double frameRate, int maxFrames) {
+        BigDecimal rate = BigDecimal.valueOf(frameRate);
+        for (int frame = 1; frame <= maxFrames; frame++) {
+            BigDecimal fraction = BigDecimal.valueOf(frame).divide(rate, 10, BigDecimal.ROUND_HALF_UP).remainder(BigDecimal.ONE);
+            for (int scale = 3; scale <= 6; scale++) {
+                BigDecimal value = fraction.setScale(scale, BigDecimal.ROUND_HALF_UP).stripTrailingZeros();
+                if (value.compareTo(BigDecimal.ZERO) != 0) features.add(value);
+            }
+        }
+    }
+
+    private static BigDecimal parseExtInfDuration(String line) {
+        int start = getExtInfValueStart(line);
+        if (start < 0) return BigDecimal.ZERO;
+        int end = getExtInfValueEnd(line, start);
+        try {
+            return new BigDecimal(line.substring(start, end)).stripTrailingZeros();
+        } catch (Exception ignored) {
+        }
+        return BigDecimal.ZERO;
+    }
+
+    private static int getExtInfValueStart(String line) {
+        if (line == null) return -1;
+        int length = line.length();
+        int start = 0;
+        while (start < length && line.charAt(start) <= ' ') start += 1;
+        if (!line.startsWith(TAG_MEDIA_DURATION, start)) return -1;
+        start += TAG_MEDIA_DURATION.length();
+        if (start >= length || line.charAt(start) != ':') return -1;
+        start += 1;
+        while (start < length && line.charAt(start) <= ' ') start += 1;
+        return start < length ? start : -1;
+    }
+
+    private static int getExtInfValueEnd(String line, int start) {
+        int end = line.indexOf(',', start);
+        if (end < 0) end = line.length();
+        while (end > start && line.charAt(end - 1) <= ' ') end -= 1;
+        return end;
+    }
+
+    private static int getAdSegmentLimit(String m3u8Content) {
+        BigDecimal totalDuration = BigDecimal.ZERO;
+        for (String raw : m3u8Content.split("\\n")) totalDuration = totalDuration.add(parseExtInfDuration(raw));
+        double totalMinutes = totalDuration.doubleValue() / 60;
+        if (totalMinutes <= 30) return 18;
+        if (totalMinutes <= 60) return 24;
+        if (totalMinutes <= 90) return 30;
+        return 36;
+    }
+
+    private static class FrameRateStats {
+        private int matched;
+        private int mismatched;
+    }
+
+    private static class DecimalPrecisionStats {
+        private int total;
+        private int mismatched;
     }
 
     private static String resolveContent(String tsUrlPre, String m3u8Content) {
@@ -263,8 +519,7 @@ public class M3u8 {
         return scan ? scan(line, ads) : line;
     }
 
-    private static String cleanCommonAdMarkers(String tsUrlPre, String m3u8Content) {
-        String line = resolveContent(tsUrlPre, m3u8Content);
+    private static String cleanCommonAdMarkers(String line) {
         StringBuilder sb = new StringBuilder();
         List<String> pending = new ArrayList<>();
         boolean inAdBreak = false;
@@ -400,13 +655,12 @@ public class M3u8 {
         return false;
     }
 
-    private static String cleanDiscontinuityGroups(String tsUrlPre, String m3u8Content) {
-        String line = resolveContent(tsUrlPre, m3u8Content);
-        String[] lines = line.split("\n");
+    private static String cleanDiscontinuityGroups(String m3u8Content) {
+        String[] lines = m3u8Content.split("\n");
         List<Group> groups = buildDiscontinuityGroups(lines);
-        if (groups.size() < 3) return line;
+        if (groups.size() < 3) return m3u8Content;
         Group main = findMainGroup(groups);
-        if (main == null || main.segmentCount < 3) return line;
+        if (main == null || main.segmentCount < 3) return m3u8Content;
 
         StringBuilder sb = new StringBuilder();
         boolean changed = false;
@@ -418,7 +672,7 @@ public class M3u8 {
             }
             group.appendTo(sb);
         }
-        return changed ? sb.toString() : line;
+        return changed ? sb.toString() : m3u8Content;
     }
 
     private static List<Group> buildDiscontinuityGroups(String[] lines) {
@@ -587,10 +841,11 @@ public class M3u8 {
         private void add(String raw) {
             lines.add(raw);
             String line = raw.trim();
-            Matcher matcher = REGEX_MEDIA_DURATION.matcher(line);
-            if (matcher.find()) {
+            int durationStart = getExtInfValueStart(line);
+            if (durationStart >= 0) {
+                int durationEnd = getExtInfValueEnd(line, durationStart);
                 try {
-                    totalDuration += Double.parseDouble(matcher.group(1));
+                    totalDuration += Double.parseDouble(line.substring(durationStart, durationEnd));
                 } catch (Exception ignored) {
                 }
             }
