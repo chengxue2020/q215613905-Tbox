@@ -87,7 +87,10 @@ public class JarLoader {
             file.setReadOnly();
             String cachePath = jarDir().getAbsolutePath();
             DexClassLoader loader = new DexClassLoader(file.getAbsolutePath(), cachePath, cachePath, App.getInstance().getClassLoader());
-            invokeInit(loader, file.getAbsolutePath());
+            if (!invokeInit(loader, file.getAbsolutePath())) {
+                Log.i(TAG, "load error key=" + key + ", protected jar loader not bound");
+                return false;
+            }
             invokeProxy(key, loader);
             invokeDanmaku(key, loader);
             injectProxyPort(loader);
@@ -101,19 +104,22 @@ public class JarLoader {
         }
     }
 
-    private void invokeInit(DexClassLoader loader, String jar) {
+    private boolean invokeInit(DexClassLoader loader, String jar) {
+        boolean protectedJar = false;
         try {
             Class<?> clz = loader.loadClass("com.github.catvod.spider.Init");
-            Method method = clz.getMethod("init", Context.class);
-            if (protectedInitJar.check(jar)) {
+            protectedJar = protectedInitJar.check(jar);
+            if (protectedJar) {
                 Log.i(TAG, "echo-load initProtectedJar file=" + jar);
-                protectedInitJar.init(clz);
+                return protectedInitJar.init(clz);
             } else {
+                Method method = clz.getMethod("init", Context.class);
                 method.invoke(null, App.getInstance());
             }
         } catch (Throwable e) {
             e.printStackTrace();
         }
+        return !protectedJar;
     }
 
     private void invokeProxy(String key, DexClassLoader loader) {

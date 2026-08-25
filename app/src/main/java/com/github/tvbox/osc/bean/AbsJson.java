@@ -22,7 +22,7 @@ public class AbsJson implements Serializable {
 
     public class AbsJsonVod implements Serializable {
         public int group_id; //: 0
-        public int type_id; //: 32
+        public String type_id; //: 32
         public int type_id_1; //: 31
         public String type_name; //: "国产剧"
         public String vod_actor; //: "黄小戈,赵旭东,时男,傅隽,张佳琳"
@@ -112,7 +112,11 @@ public class AbsJson implements Serializable {
             video.action = action;
             video.last = vod_time;
             video.id = vod_id;
-            video.tid = type_id;
+            try {
+                video.tid = Integer.parseInt(type_id);
+            } catch (NumberFormatException ignored) {
+                video.tid = 0;
+            }
             video.name = vod_name;
             video.type = type_name;
             // video.dt = vod_play_from == null ? "" : vod_play_from.replace("$$$", ",");

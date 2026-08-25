@@ -151,8 +151,16 @@ public class HistoryActivity extends BaseActivity {
         historyAdapter.setOnItemLongClickListener(new BaseQuickAdapter.OnItemLongClickListener() {
             @Override
             public boolean onItemLongClick(BaseQuickAdapter adapter, View view, int position) {
-                tvDelete.setFocusable(true);
-                toggleDelMode();
+                VodInfo vodInfo = historyAdapter.getData().get(position);
+                if (vodInfo != null) {
+                    Bundle bundle = new Bundle();
+                    bundle.putString("title", vodInfo.name);
+                    if (Hawk.get(HawkConfig.FAST_SEARCH_MODE, true)) {
+                        jumpActivity(FastSearchActivity.class, bundle);
+                    } else {
+                        jumpActivity(SearchActivity.class, bundle);
+                    }
+                }
                 return true;
             }
         });

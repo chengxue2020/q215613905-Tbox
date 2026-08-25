@@ -21,6 +21,7 @@ import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.owen.tvrecyclerview.widget.TvRecyclerView;
 import com.owen.tvrecyclerview.widget.V7GridLayoutManager;
+import com.orhanobut.hawk.Hawk;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -121,6 +122,7 @@ public class CollectActivity extends BaseActivity {
                             bundle.putString("sourceKey", vodInfo.sourceKey);
                             bundle.putString("title", vodInfo.name);
                             bundle.putString("picture", vodInfo.pic);
+                            bundle.putBoolean("collect", true);
                             jumpActivity(DetailActivity.class, bundle);
                         } else {
                             Intent newIntent = new Intent(mContext, SearchActivity.class);
@@ -135,12 +137,16 @@ public class CollectActivity extends BaseActivity {
         collectAdapter.setOnItemLongClickListener(new BaseQuickAdapter.OnItemLongClickListener() {
             @Override
             public boolean onItemLongClick(BaseQuickAdapter adapter, View view, int position) {
-//                FastClickCheckUtil.check(view);
-//                VodCollect vodInfo = collectAdapter.getData().get(position);
-//                collectAdapter.remove(position);
-//                RoomDataManger.deleteVodCollect(vodInfo.getId());
-                tvDelete.setFocusable(true);
-                toggleDelMode();
+                VodCollect vodInfo = collectAdapter.getData().get(position);
+                if (vodInfo != null) {
+                    Bundle bundle = new Bundle();
+                    bundle.putString("title", vodInfo.name);
+                    if (Hawk.get(HawkConfig.FAST_SEARCH_MODE, true)) {
+                        jumpActivity(FastSearchActivity.class, bundle);
+                    } else {
+                        jumpActivity(SearchActivity.class, bundle);
+                    }
+                }
                 return true;
             }
         });

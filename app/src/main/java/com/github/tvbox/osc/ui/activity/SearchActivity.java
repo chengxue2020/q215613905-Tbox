@@ -115,6 +115,8 @@ public class SearchActivity extends BaseActivity {
     private PinyinAdapter wordAdapter;
     private PinyinAdapter hotWordAdapter;
     private String searchTitle = "";
+    private final List<Movie.Video> highMatchVods = new ArrayList<>();
+    private boolean showHighMatchResults = false;
     private TextView tvSearchCheckboxBtn;
 
     private static HashMap<String, String> mCheckSources = null;
@@ -710,6 +712,7 @@ public class SearchActivity extends BaseActivity {
     private final Set<String> startedSearchKeys = Collections.synchronizedSet(new HashSet<String>());
     private final Set<String> releasedSearchKeys = Collections.synchronizedSet(new HashSet<String>());
     private final AtomicInteger searchTokenSeq = new AtomicInteger(0);
+    private final AtomicInteger totalSearchCount = new AtomicInteger(0);
     private String currentSearchToken = "";
     private boolean searchPaused = false;
 
@@ -733,6 +736,9 @@ public class SearchActivity extends BaseActivity {
             waitingSearchTasks.clear();
             startedSearchKeys.clear();
             releasedSearchKeys.clear();
+            highMatchVods.clear();
+            showHighMatchResults = false;
+            totalSearchCount.set(0);
             currentSearchToken = String.valueOf(searchTokenSeq.incrementAndGet());
             searchPaused = false;
         }
@@ -761,6 +767,7 @@ public class SearchActivity extends BaseActivity {
             pendingSearchKeys.add(task.sourceKey);
         }
         allRunCount.set(searchTasks.size());
+        totalSearchCount.set(searchTasks.size());
         searchExecutorService = createSearchExecutor();
         searchTimeoutExecutor = Executors.newSingleThreadScheduledExecutor();
         startFastSearchTasks(searchTasks);
@@ -773,6 +780,29 @@ public class SearchActivity extends BaseActivity {
         return TextUtils.equals(name.trim(), searchTitle.trim());
     }
 
+    private boolean isHighMatchSearchResult(Movie.Video video) {
+        return video != null && !TextUtils.isEmpty(video.name) && !TextUtils.isEmpty(searchTitle)
+                && video.name.replaceAll("\\s+", "").startsWith(searchTitle.replaceAll("\\s+", ""));
+    }
+
+    private boolean shouldShowHighMatchResults() {
+        if (showHighMatchResults || searchAdapter.getData().size() > 0) return false;
+        int total = totalSearchCount.get();
+        int threshold = Math.min(SEARCH_THREAD_COUNT, total);
+        return threshold > 0 && total - allRunCount.get() >= threshold;
+    }
+
+    private void addSearchResults(List<Movie.Video> data) {
+        if (data == null || data.isEmpty()) return;
+        if (searchAdapter.getData().size() > 0) {
+            searchAdapter.addData(data);
+        } else {
+            showSuccess();
+            mGridView.setVisibility(View.VISIBLE);
+            searchAdapter.setNewData(data);
+        }
+    }
+
     private void searchData(AbsXml absXml) {
         if (!isCurrentSearchResult(absXml)) {
             return;
@@ -783,17 +813,28 @@ public class SearchActivity extends BaseActivity {
         }
         releaseSearchSlotAndStartNext(sourceKey, absXml.searchToken);
         if (absXml != null && absXml.movie != null && absXml.movie.videoList != null && absXml.movie.videoList.size() > 0) {
-            List<Movie.Video> data = new ArrayList<>();
+            List<Movie.Video> exactData = new ArrayList<>();
+            List<Movie.Video> highData = new ArrayList<>();
             for (Movie.Video video : absXml.movie.videoList) {
-                if (matchSearchResult(video.name, searchTitle)) data.add(video);
+                if (isHighMatchSearchResult(video)) {
+                    highMatchVods.add(video);
+                    highData.add(video);
+                }
+                if (matchSearchResult(video.name, searchTitle)) {
+                    exactData.add(video);
+                }
             }
-            if (searchAdapter.getData().size() > 0) {
-                searchAdapter.addData(data);
-            } else {
-                showSuccess();
-                mGridView.setVisibility(View.VISIBLE);
-                searchAdapter.setNewData(data);
+
+            if (showHighMatchResults) {
+                addSearchResults(highData);
+            } else if (!exactData.isEmpty()) {
+                addSearchResults(exactData);
             }
+        }
+
+        if (shouldShowHighMatchResults()) {
+            showHighMatchResults = true;
+            addSearchResults(new ArrayList<>(highMatchVods));
         }
 
         finishSearchIfDone();

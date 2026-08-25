@@ -43,7 +43,7 @@ class ProtectedInitJar {
         return result;
     }
 
-    void init(Class<?> clz) {
+    boolean init(Class<?> clz) {
         Object init = null;
         try {
             Method get = clz.getMethod("get");
@@ -51,9 +51,10 @@ class ProtectedInitJar {
         } catch (Throwable ignored) {
         }
         bindContext(clz, init);
-        bindDexLoader(clz, init);
+        if (!bindDexLoader(clz, init)) return false;
         invokeNoArg(clz, "replaceCloudDiskNames");
         invokeStartGoProxy(clz);
+        return true;
     }
 
     private void bindContext(Class<?> clz, Object init) {
@@ -75,20 +76,26 @@ class ProtectedInitJar {
         }
     }
 
-    private void bindDexLoader(Class<?> clz, Object init) {
-        if (init == null) return;
+    private boolean bindDexLoader(Class<?> clz, Object init) {
+        if (init == null) return false;
         try {
             Class<?> nativeClass = clz.getClassLoader().loadClass("com.github.catvod.spider.DexNative");
             Method getLoader = nativeClass.getMethod("getLoader", Object.class);
             Object loader = getLoader.invoke(null, App.getInstance());
-            if (!(loader instanceof DexClassLoader)) return;
-            for (Field field : clz.getDeclaredFields()) {
-                if (Modifier.isStatic(field.getModifiers()) || !DexClassLoader.class.isAssignableFrom(field.getType())) continue;
-                field.setAccessible(true);
-                field.set(init, loader);
+            if (!(loader instanceof DexClassLoader)) return false;
+            boolean bound = false;
+            for (Class<?> type = clz; type != null; type = type.getSuperclass()) {
+                for (Field field : type.getDeclaredFields()) {
+                    if (Modifier.isStatic(field.getModifiers()) || !DexClassLoader.class.isAssignableFrom(field.getType())) continue;
+                    field.setAccessible(true);
+                    field.set(init, loader);
+                    bound = true;
+                }
             }
+            return bound;
         } catch (Throwable ignored) {
         }
+        return false;
     }
 
     private void invokeNoArg(Class<?> clz, String methodName) {

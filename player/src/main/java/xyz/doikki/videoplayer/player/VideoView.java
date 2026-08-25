@@ -369,7 +369,6 @@ public class VideoView<P extends AbstractPlayer> extends FrameLayout
                     holder.addCallback(new SurfaceHolder.Callback() {
                         @Override
                         public void surfaceCreated(SurfaceHolder holder) {
-                            addDisplay();
                             if (mRenderView != null) {
                                 mRenderView.setScaleType(mCurrentScreenScaleType);
                                 mRenderView.setVideoSize(mVideoSize[0], mVideoSize[1]);
