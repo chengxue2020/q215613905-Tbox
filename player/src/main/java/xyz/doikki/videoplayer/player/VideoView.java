@@ -302,6 +302,7 @@ public class VideoView<P extends AbstractPlayer> extends FrameLayout
             }
         }
         if (prepareDataSource()) {
+            mMediaPlayer.setStartPosition(mCurrentPosition);
             mMediaPlayer.prepareAsync();
             setPlayState(STATE_PREPARING);
             setPlayerState(isFullScreen() ? PLAYER_FULL_SCREEN : isTinyScreen() ? PLAYER_TINY_SCREEN : PLAYER_NORMAL);
@@ -578,12 +579,13 @@ public class VideoView<P extends AbstractPlayer> extends FrameLayout
      */
     @Override
     public void onPrepared() {
+        // Custom players may not implement the common start-position contract.
+        if (mCurrentPosition > 0 && !mMediaPlayer.isStartPositionApplied()) {
+            mMediaPlayer.seekTo(mCurrentPosition);
+        }
         setPlayState(STATE_PREPARED);
         if (!isMute() && mAudioFocusHelper != null) {
             mAudioFocusHelper.requestFocus();
-        }
-        if (mCurrentPosition > 0) {
-            seekTo(mCurrentPosition);
         }
     }
 

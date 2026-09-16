@@ -26,7 +26,7 @@
 package com.github.tvbox.osc.subtitle;
 
 import android.os.Handler;
-import android.os.HandlerThread;
+import android.os.Looper;
 import android.os.Message;
 import androidx.annotation.Nullable;
 import android.text.TextUtils;
@@ -56,9 +56,6 @@ public class DefaultSubtitleEngine implements SubtitleEngine {
     private static final int MSG_REFRESH = 0x888;
     private static final int REFRESH_INTERVAL = 100;
 
-    @Nullable
-    private HandlerThread mHandlerThread;
-    @Nullable
     private Handler mWorkHandler;
     @Nullable
     private List<Subtitle> mSubtitles;
@@ -66,6 +63,7 @@ public class DefaultSubtitleEngine implements SubtitleEngine {
     private AbstractPlayer mMediaPlayer;
     private OnSubtitlePreparedListener mOnSubtitlePreparedListener;
     private OnSubtitleChangeListener mOnSubtitleChangeListener;
+    private boolean mergeSameTime;
 
     public DefaultSubtitleEngine() {
 
@@ -101,7 +99,7 @@ public class DefaultSubtitleEngine implements SubtitleEngine {
                     Log.d(TAG, "onSuccess: captions is null.");
                     return;
                 }
-                mSubtitles = new ArrayList<>(captions.values());
+                mSubtitles = buildSubtitles(captions);
                 setSubtitleDelay(SubtitleHelper.getTimeDelay());
                 notifyPrepared();
 
@@ -128,6 +126,38 @@ public class DefaultSubtitleEngine implements SubtitleEngine {
                 Log.e(TAG, "onError: " + exception.getMessage());
             }
         });
+    }
+
+    public void setMergeSameTime(boolean mergeSameTime) {
+        this.mergeSameTime = mergeSameTime;
+    }
+
+    private List<Subtitle> buildSubtitles(TreeMap<Integer, Subtitle> captions) {
+        List<Subtitle> subtitles = new ArrayList<>();
+        for (Subtitle subtitle : captions.values()) {
+            if (mergeSameTime && !subtitles.isEmpty()) {
+                Subtitle previous = subtitles.get(subtitles.size() - 1);
+                if (previous.start.mseconds == subtitle.start.mseconds
+                        && previous.end.mseconds == subtitle.end.mseconds) {
+                    if (previous.lines == null) {
+                        previous.lines = new ArrayList<>();
+                        previous.lines.add(previous);
+                    }
+                    previous.lines.add(subtitle);
+                    if (!TextUtils.isEmpty(subtitle.content)) {
+                        if (!TextUtils.isEmpty(previous.content)) previous.content += "\n";
+                        previous.content += subtitle.content;
+                    }
+                    continue;
+                }
+            }
+            if (mergeSameTime) {
+                subtitle.lines = new ArrayList<>();
+                subtitle.lines.add(subtitle);
+            }
+            subtitles.add(subtitle);
+        }
+        return subtitles;
     }
 
     @Override
@@ -158,7 +188,7 @@ public class DefaultSubtitleEngine implements SubtitleEngine {
         mSubtitles = thisSubtitles;
     }
 
-    private static String playSubtitleCacheKey;
+    private String playSubtitleCacheKey;
     public void setPlaySubtitleCacheKey(String cacheKey) {
         playSubtitleCacheKey = cacheKey;
     }
@@ -219,9 +249,7 @@ public class DefaultSubtitleEngine implements SubtitleEngine {
 
     private void initWorkThread() {
         stopWorkThread();
-        mHandlerThread = new HandlerThread("SubtitleFindThread");
-        mHandlerThread.start();
-        mWorkHandler = new Handler(mHandlerThread.getLooper(), new Handler.Callback() {
+        mWorkHandler = new Handler(Looper.getMainLooper(), new Handler.Callback() {
             @Override
             public boolean handleMessage(final Message msg) {
                 try {
@@ -247,10 +275,6 @@ public class DefaultSubtitleEngine implements SubtitleEngine {
     }
 
     private void stopWorkThread() {
-        if (mHandlerThread != null) {
-            mHandlerThread.quit();
-            mHandlerThread = null;
-        }
         if (mWorkHandler != null) {
             mWorkHandler.removeCallbacksAndMessages(null);
             mWorkHandler = null;

@@ -5,10 +5,12 @@
     android:background="@drawable/button_danmu_setting">
 
     <LinearLayout
+        android:id="@+id/danmuItem"
         android:layout_width="match_parent"
         android:layout_height="@dimen/vs_50"
         android:layout_marginBottom="@dimen/vs_10"
         android:background="@drawable/shape_setting_sort_focus"
+        android:clickable="true"
         android:focusable="true"
         android:gravity="center_vertical"
         android:orientation="horizontal"

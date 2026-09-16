@@ -58,6 +58,14 @@ public class SearchDanmuDialog extends BaseDialog {
                 loadDanmu(searchAdapter.getData().get(position));
             }
         });
+        searchAdapter.setOnItemChildClickListener(new BaseQuickAdapter.OnItemChildClickListener() {
+            @Override
+            public void onItemChildClick(BaseQuickAdapter adapter, View view, int position) {
+                if (view.getId() != R.id.danmuItem) return;
+                FastClickCheckUtil.check(view);
+                loadDanmu(searchAdapter.getData().get(position));
+            }
+        });
         searchButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {

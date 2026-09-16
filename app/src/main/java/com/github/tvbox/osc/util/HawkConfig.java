@@ -19,8 +19,8 @@ public class HawkConfig {
     public static final String DEBUG_OPEN = "debug_open";
     public static final String PARSE_WEBVIEW = "parse_webview"; // true 系统 false xwalk
     public static final String IJK_CODEC = "ijk_codec";
-    public static final String PLAY_TYPE = "play_type";//0 系统 1 ijk 2 exo 10 MXPlayer
-    public static final String LIVE_PLAY_TYPE = "live_play_type";//0 系统 1 ijk 2 exo 10 MXPlayer
+    public static final String PLAY_TYPE = "play_type";//1 ijk 2 exo 10 MXPlayer
+    public static final String LIVE_PLAY_TYPE = "live_play_type";//1 ijk 2 exo 10 MXPlayer
     public static final String PLAY_RENDER = "play_render"; //0 texture 2
     public static final String PLAY_SCALE = "play_scale"; //0 texture 2
     public static final String LIVE_PLAY_SCALE = "live_play_scale";

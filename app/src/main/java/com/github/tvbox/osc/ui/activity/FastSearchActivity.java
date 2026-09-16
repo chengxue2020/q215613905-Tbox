@@ -48,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -66,10 +67,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class FastSearchActivity extends BaseActivity {
     private static final int SEARCH_THREAD_COUNT = 6;
-    private static final int SEARCH_MAX_THREAD_COUNT = Build.VERSION.SDK_INT >= 30 ? 18 : 12;
+    private static final int SEARCH_MAX_THREAD_COUNT = Build.VERSION.SDK_INT >= 35 ? 24 : Build.VERSION.SDK_INT >= 30 ? 18 : 12;
     private static final int SEARCH_PUMP_SECONDS = 2;
     private static final int SEARCH_NEXT_BATCH_SECONDS = 3;
-    private static final int SEARCH_SITE_TIMEOUT_SECONDS = 10;
+    private static final int SEARCH_SITE_TIMEOUT_SECONDS = 15;
     private static final long POSTER_FOCUS_ANIM_DURATION = 300L;
     private static final float POSTER_FOCUS_SCALE = 1.05f;
     private static final String SEARCH_ALL_NAME = "\u5168\u90e8";
@@ -189,13 +190,7 @@ public class FastSearchActivity extends BaseActivity {
                 FastClickCheckUtil.check(view);
                 Movie.Video video = searchAdapter.getData().get(position);
                 if (video != null) {
-                    pauseSearchTasks();
-                    Bundle bundle = new Bundle();
-                    bundle.putString("id", video.id);
-                    bundle.putString("sourceKey", video.sourceKey);
-                    bundle.putString("title", video.name);
-                    bundle.putString("picture", video.pic);
-                    jumpActivity(DetailActivity.class, bundle);
+                    openSearchVideo(video, false);
                 }
             }
         });
@@ -225,13 +220,7 @@ public class FastSearchActivity extends BaseActivity {
                 FastClickCheckUtil.check(view);
                 Movie.Video video = searchAdapterFilter.getData().get(position);
                 if (video != null) {
-                    pauseSearchTasks();
-                    Bundle bundle = new Bundle();
-                    bundle.putString("id", video.id);
-                    bundle.putString("sourceKey", video.sourceKey);
-                    bundle.putString("title", video.name);
-                    bundle.putString("picture", video.pic);
-                    jumpActivity(DetailActivity.class, bundle);
+                    openSearchVideo(video, true);
                 }
             }
         });
@@ -269,6 +258,89 @@ public class FastSearchActivity extends BaseActivity {
 
     private void initViewModel() {
         sourceViewModel = new ViewModelProvider(this).get(SourceViewModel.class);
+        sourceViewModel.listResult.observe(this, new androidx.lifecycle.Observer<AbsXml>() {
+            @Override
+            public void onChanged(AbsXml data) {
+                if (!folderLoading) return;
+                folderLoading = false;
+                if (data == null || data.movie == null || data.movie.videoList == null) {
+                    showEmpty();
+                    return;
+                }
+                showSuccess();
+                if (folderFilterMode) {
+                    mGridView.setVisibility(View.GONE);
+                    mGridViewFilter.setVisibility(View.VISIBLE);
+                    searchAdapterFilter.setNewData(data.movie.videoList);
+                } else {
+                    mGridViewFilter.setVisibility(View.GONE);
+                    mGridView.setVisibility(View.VISIBLE);
+                    searchAdapter.setNewData(data.movie.videoList);
+                }
+            }
+        });
+    }
+
+    private void openSearchVideo(Movie.Video video, boolean filterMode) {
+        pauseSearchTasks();
+        if (TextUtils.equals("folder", video.tag)) {
+            folderHistory.add(new ArrayList<>(filterMode ? searchAdapterFilter.getData() : searchAdapter.getData()));
+            folderHistoryFilter.add(filterMode);
+            folderHistorySiteKeys.add(getSelectedSearchSiteKey());
+            folderFilterMode = filterMode;
+            folderLoading = true;
+            showLoading();
+            sourceViewModel.getList(video.sourceKey, video.id);
+            return;
+        }
+        Bundle bundle = new Bundle();
+        bundle.putString("id", video.id);
+        bundle.putString("sourceKey", video.sourceKey);
+        bundle.putString("title", video.name);
+        bundle.putString("picture", video.pic);
+        putDetailFallbackCandidates(bundle, video);
+        jumpActivity(DetailActivity.class, bundle);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (!folderHistory.isEmpty()) {
+            String currentSiteKey = getSelectedSearchSiteKey();
+            String folderSiteKey = folderHistorySiteKeys.get(folderHistorySiteKeys.size() - 1);
+            if (!TextUtils.equals(currentSiteKey, folderSiteKey)) {
+                folderLoading = false;
+                folderHistory.clear();
+                folderHistoryFilter.clear();
+                folderHistorySiteKeys.clear();
+                super.onBackPressed();
+                return;
+            }
+            folderLoading = false;
+            List<Movie.Video> previous = folderHistory.remove(folderHistory.size() - 1);
+            boolean filterMode = folderHistoryFilter.remove(folderHistoryFilter.size() - 1);
+            folderHistorySiteKeys.remove(folderHistorySiteKeys.size() - 1);
+            folderFilterMode = filterMode;
+            showSuccess();
+            if (filterMode) {
+                mGridView.setVisibility(View.GONE);
+                mGridViewFilter.setVisibility(View.VISIBLE);
+                searchAdapterFilter.setNewData(previous);
+            } else {
+                mGridViewFilter.setVisibility(View.GONE);
+                mGridView.setVisibility(View.VISIBLE);
+                searchAdapter.setNewData(previous);
+            }
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    private String getSelectedSearchSiteKey() {
+        if (TextUtils.isEmpty(selectedWordName) || TextUtils.equals(selectedWordName, SEARCH_ALL_NAME)) {
+            return SEARCH_ALL_NAME;
+        }
+        String key = spNames.get(selectedWordName);
+        return TextUtils.isEmpty(key) ? selectedWordName : key;
     }
 
     private void filterResult(String spName) {
@@ -386,7 +458,7 @@ public class FastSearchActivity extends BaseActivity {
     private void fenci() {
         if (!quickSearchWord.isEmpty()) return; // 如果经有分词了，不再进行二次分词
         quickSearchWord.addAll(SearchHelper.splitWords(searchTitle));
-        List<String> words = new ArrayList<>(new HashSet<>(quickSearchWord));
+        List<String> words = new ArrayList<>(new LinkedHashSet<>(quickSearchWord));
         EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_QUICK_SEARCH_WORD, words));
         // 分词
 //        OkGo.<String>get("http://api.pullword.com/get.php?source=" + URLEncoder.encode(searchTitle) + "&param1=0&param2=0&json=1")
@@ -505,6 +577,12 @@ public class FastSearchActivity extends BaseActivity {
     private final AtomicInteger timedOutSearchCount = new AtomicInteger(0);
     private String currentSearchToken = "";
     private boolean searchPaused = false;
+    private final List<Movie.Video> detailFallbackSearchResults = new ArrayList<>();
+    private boolean folderFilterMode;
+    private final List<List<Movie.Video>> folderHistory = new ArrayList<>();
+    private final List<Boolean> folderHistoryFilter = new ArrayList<>();
+    private final List<String> folderHistorySiteKeys = new ArrayList<>();
+    private boolean folderLoading;
 
     private void searchResult() {
         try {
@@ -532,6 +610,10 @@ public class FastSearchActivity extends BaseActivity {
             searchPaused = false;
             totalSearchCount.set(0);
             timedOutSearchCount.set(0);
+            detailFallbackSearchResults.clear();
+            folderHistory.clear();
+            folderHistoryFilter.clear();
+            folderHistorySiteKeys.clear();
             updateSearchStatus();
         }
         List<SourceBean> searchRequestList = new ArrayList<>();
@@ -658,6 +740,7 @@ public class FastSearchActivity extends BaseActivity {
         if (absXml != null && absXml.movie != null && absXml.movie.videoList != null && absXml.movie.videoList.size() > 0) {
             for (Movie.Video video : absXml.movie.videoList) {
                 if (!matchSearchResult(video.name, searchTitle)) continue;
+                detailFallbackSearchResults.add(video);
                 if (!resultVods.containsKey(video.sourceKey)) {
                     resultVods.put(video.sourceKey, new ArrayList<Movie.Video>());
                 }
@@ -685,6 +768,31 @@ public class FastSearchActivity extends BaseActivity {
         }
 
         finishSearchIfDone();
+    }
+
+    private void putDetailFallbackCandidates(Bundle bundle, Movie.Video selectedVideo) {
+        if (bundle == null || selectedVideo == null || TextUtils.isEmpty(selectedVideo.name)) {
+            return;
+        }
+        String title = selectedVideo.name.trim();
+        ArrayList<Movie.Video> candidates = new ArrayList<>();
+        Set<String> keys = new HashSet<>();
+        for (Movie.Video video : detailFallbackSearchResults) {
+            if (video == null || TextUtils.isEmpty(video.id)
+                    || !TextUtils.equals(title, video.name == null ? "" : video.name.trim())) {
+                continue;
+            }
+            String key = (video.sourceKey == null ? "" : video.sourceKey) + "|" + video.id;
+            if (keys.add(key)) {
+                candidates.add(video);
+                if (candidates.size() >= 20) {
+                    break;
+                }
+            }
+        }
+        if (!candidates.isEmpty()) {
+            bundle.putSerializable(DetailActivity.EXTRA_DETAIL_FALLBACK_CANDIDATES, candidates);
+        }
     }
 
     private void scheduleSearchAdvance(final String sourceKey, final String searchToken) {

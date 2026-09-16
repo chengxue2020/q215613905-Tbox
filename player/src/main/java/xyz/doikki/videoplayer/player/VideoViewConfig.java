@@ -3,6 +3,7 @@ package xyz.doikki.videoplayer.player;
 
 import androidx.annotation.Nullable;
 
+import xyz.doikki.videoplayer.exo.ExoMediaPlayerFactory;
 import xyz.doikki.videoplayer.render.RenderViewFactory;
 import xyz.doikki.videoplayer.render.TextureRenderViewFactory;
 
@@ -41,8 +42,8 @@ public class VideoViewConfig {
         mProgressManager = builder.mProgressManager;
         mScreenScaleType = builder.mScreenScaleType;
         if (builder.mPlayerFactory == null) {
-            //默认为AndroidMediaPlayer
-            mPlayerFactory = AndroidMediaPlayerFactory.create();
+            //默认为ExoMediaPlayer
+            mPlayerFactory = ExoMediaPlayerFactory.create();
         } else {
             mPlayerFactory = builder.mPlayerFactory;
         }

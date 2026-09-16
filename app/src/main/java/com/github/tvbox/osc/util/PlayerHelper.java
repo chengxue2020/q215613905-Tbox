@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import tv.danmaku.ijk.media.player.IjkLibLoader;
-import xyz.doikki.videoplayer.player.AndroidMediaPlayerFactory;
 import xyz.doikki.videoplayer.player.PlayerFactory;
 import xyz.doikki.videoplayer.player.VideoView;
 import xyz.doikki.videoplayer.render.RenderViewFactory;
@@ -73,7 +72,7 @@ public class PlayerHelper {
         } else if (playerType == 2) {
             playerFactory = ExoMediaPlayerFactory.create();
         } else {
-            playerFactory = AndroidMediaPlayerFactory.create();
+            playerFactory = ExoMediaPlayerFactory.create();
         }
         RenderViewFactory renderViewFactory = null;
         switch (renderType) {
@@ -119,7 +118,7 @@ public class PlayerHelper {
         } else if (playType == 2) {
             playerFactory = ExoMediaPlayerFactory.create();
         } else {
-            playerFactory = AndroidMediaPlayerFactory.create();
+            playerFactory = ExoMediaPlayerFactory.create();
         }
         int renderType = Hawk.get(HawkConfig.PLAY_RENDER, 0);
         RenderViewFactory renderViewFactory = null;
@@ -159,7 +158,7 @@ public class PlayerHelper {
         if (playersInfo.containsKey(playType)) {
             return playersInfo.get(playType);
         } else {
-            return "系统播放器";
+            return "EXO播放器";
         }
     }
 
@@ -167,7 +166,6 @@ public class PlayerHelper {
     public static HashMap<Integer, String> getPlayersInfo() {
         if (mPlayersInfo == null) {
             HashMap<Integer, String> playersInfo = new HashMap<>();
-            playersInfo.put(0, "系统播放器");
             playersInfo.put(1, "IJK播放器");
             playersInfo.put(2, "EXO播放器");
             playersInfo.put(10, "MX播放器");
@@ -184,7 +182,6 @@ public class PlayerHelper {
     public static HashMap<Integer, Boolean> getPlayersExistInfo() {
         if (mPlayersExistInfo == null) {
             HashMap<Integer, Boolean> playersExist = new HashMap<>();
-            playersExist.put(0, true);
             playersExist.put(1, true);
             playersExist.put(2, true);
             playersExist.put(10, MXPlayer.getPackageInfo() != null);

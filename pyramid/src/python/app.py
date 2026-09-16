@@ -9,6 +9,85 @@ import sys
 import crypto_protocol_dh
 sys.dont_write_bytecode = True
 
+# Keep Python requests as the default and fall back to the app's configured
+# Java HTTP client when an HTTPS endpoint rejects the embedded transport.
+_session_request = requests.sessions.Session.request
+try:
+    from com.undcover.freedom.pyramid import PythonHttp as _PythonHttp
+except Exception:
+    _PythonHttp = None
+
+class _JavaResponse:
+    def __init__(self, payload):
+        self.status_code = int(payload.get("status_code", 0))
+        self.headers = payload.get("headers", {})
+        self.text = payload.get("text", "")
+        self.content = self.text.encode("utf-8")
+
+    def json(self):
+        return json.loads(self.text)
+
+def _java_request(session, method, url, kwargs):
+    params = kwargs.get("params")
+    if params:
+        query = parse.urlencode(params, doseq=True)
+        url += ("&" if "?" in url else "?") + query
+    headers = dict(session.headers)
+    headers.update(kwargs.get("headers") or {})
+    # Let OkHttp's transparent gzip interceptor decode the response.
+    headers.pop("Accept-Encoding", None)
+    cookies = getattr(session, "cookies", None)
+    if cookies:
+        cookie_header = "; ".join(str(key) + "=" + str(value) for key, value in cookies.items())
+        if cookie_header:
+            headers["Cookie"] = cookie_header
+    body = kwargs.get("json")
+    if body is not None:
+        body = json.dumps(body, ensure_ascii=False)
+        headers.setdefault("Content-Type", "application/json")
+    elif kwargs.get("data") is not None:
+        body = kwargs.get("data")
+        if not isinstance(body, str):
+            body = str(body)
+    else:
+        body = ""
+    raw = _PythonHttp.request(
+        method,
+        url,
+        json.dumps(headers, ensure_ascii=False),
+        body,
+        kwargs.get("allow_redirects", True),
+    )
+    payload = json.loads(str(raw))
+    if "error" in payload:
+        raise requests.RequestException(payload["error"])
+    response = _JavaResponse(payload)
+    set_cookie = response.headers.get("Set-Cookie") or response.headers.get("set-cookie")
+    if set_cookie and cookies is not None:
+        for item in str(set_cookie).split(","):
+            pair = item.split(";", 1)[0].strip()
+            if "=" in pair:
+                key, value = pair.split("=", 1)
+                cookies.set(key.strip(), value.strip())
+    return response
+
+_JAVA_FALLBACK_STATUS = (403, 429, 495, 496, 497, 525, 526, 527)
+
+if not getattr(_session_request, "_tvbox_java_http_fallback", False):
+    def _tvbox_session_request(self, method, url, **kwargs):
+        if _PythonHttp is None or not str(url).lower().startswith("https://") or kwargs.get("stream"):
+            return _session_request(self, method, url, **kwargs)
+        try:
+            response = _session_request(self, method, url, **kwargs)
+            if response.status_code not in _JAVA_FALLBACK_STATUS:
+                return response
+        except requests.RequestException:
+            response = None
+        fallback = _java_request(self, method, url, kwargs)
+        return fallback if response is None or fallback.status_code < response.status_code else response
+    _tvbox_session_request._tvbox_java_http_fallback = True
+    requests.sessions.Session.request = _tvbox_session_request
+
 PLUGIN_DOWNLOAD_TIMEOUT = 20
 
 def createFile(file_path):

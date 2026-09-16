@@ -1130,7 +1130,7 @@ public class ApiConfig {
         ArrayList<ArrayList<String>> itemsArrayList = new ArrayList<>();
         ArrayList<String> sourceItems = new ArrayList<>();
         ArrayList<String> scaleItems = new ArrayList<>(Arrays.asList("默认", "16:9", "4:3", "填充", "原始", "裁剪"));
-        ArrayList<String> playerDecoderItems = new ArrayList<>(Arrays.asList("系统", "ijk硬解", "ijk软解", "exo"));
+        ArrayList<String> playerDecoderItems = new ArrayList<>(Arrays.asList("ijk硬解", "ijk软解", "exo"));
         ArrayList<String> timeoutItems = new ArrayList<>(Arrays.asList("5s", "10s", "15s", "20s", "25s", "30s"));
         ArrayList<String> personalSettingItems = new ArrayList<>(Arrays.asList("显示时间", "显示网速", "换台反转", "跨选分类"));
         ArrayList<String> yumItems = new ArrayList<>();
@@ -1497,7 +1497,7 @@ public class ApiConfig {
                         warmedSearchSpiderKeys.add(warmKey);
                     }
                     try {
-                        LOG.i("echo-warm-spider load:" + warmKey);
+//                        LOG.i("echo-warm-spider load:" + warmKey);
                         getCSP(source);
                     } catch (Throwable th) {
                         LOG.e("echo-warm-search-spider-error " + source.getKey() + ":" + th.getMessage());

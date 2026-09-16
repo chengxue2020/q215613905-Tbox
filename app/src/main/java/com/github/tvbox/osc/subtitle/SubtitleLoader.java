@@ -2,6 +2,7 @@ package com.github.tvbox.osc.subtitle;
 
 import android.net.Uri;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.util.Log;
 
 import com.github.tvbox.osc.subtitle.exception.FatalParsingException;
@@ -46,9 +47,40 @@ public class SubtitleLoader {
         if (path.startsWith("http://")
                 || path.startsWith("https://")) {
             loadFromRemoteAsync(path, callback);
+        } else if (path.startsWith("data:")) {
+            loadFromDataAsync(path, callback);
         } else {
             loadFromLocalAsync(path, callback);
         }
+    }
+
+    private static void loadFromDataAsync(final String dataPath, final Callback callback) {
+        AppTaskExecutor.deskIO().execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final SubtitleLoadSuccessResult result = loadFromData(dataPath);
+                    if (callback != null) {
+                        AppTaskExecutor.mainThread().execute(new Runnable() {
+                            @Override
+                            public void run() {
+                                callback.onSuccess(result);
+                            }
+                        });
+                    }
+                } catch (final Exception e) {
+                    e.printStackTrace();
+                    if (callback != null) {
+                        AppTaskExecutor.mainThread().execute(new Runnable() {
+                            @Override
+                            public void run() {
+                                callback.onError(e);
+                            }
+                        });
+                    }
+                }
+            }
+        });
     }
 
     private static void loadFromRemoteAsync(final String remoteSubtitlePath,
@@ -123,6 +155,8 @@ public class SubtitleLoader {
             if (path.startsWith("http://")
                     || path.startsWith("https://")) {
                 return loadFromRemote(path);
+            } else if (path.startsWith("data:")) {
+                return loadFromData(path);
             } else {
                 return loadFromLocal(path);
             }
@@ -130,6 +164,32 @@ public class SubtitleLoader {
             e.printStackTrace();
         }
         return null;
+    }
+
+    private static SubtitleLoadSuccessResult loadFromData(final String dataPath)
+            throws IOException, FatalParsingException {
+        int comma = dataPath.indexOf(',');
+        if (comma < 0) throw new IOException("Invalid subtitle data URI");
+        int fragment = dataPath.indexOf('#', comma + 1);
+        String metadata = dataPath.substring(5, comma).toLowerCase();
+        String encoded = dataPath.substring(comma + 1, fragment < 0 ? dataPath.length() : fragment);
+        byte[] bytes;
+        if (metadata.contains(";base64")) {
+            bytes = Base64.decode(encoded, Base64.DEFAULT);
+        } else {
+            bytes = Uri.decode(encoded).getBytes("UTF-8");
+        }
+        String fileName = fragment < 0 ? "subtitle.ass" : Uri.decode(dataPath.substring(fragment + 1));
+        if (!FileUtils.hasExtension(fileName)) {
+            fileName += metadata.contains("vtt") ? ".vtt" : ".ass";
+        }
+        String content = new String(bytes, "UTF-8");
+        SubtitleLoadSuccessResult result = new SubtitleLoadSuccessResult();
+        result.timedTextObject = loadAndParse(new ByteArrayInputStream(bytes), fileName);
+        result.fileName = fileName;
+        result.content = content;
+        result.subtitlePath = dataPath;
+        return result;
     }
 
     private static SubtitleLoadSuccessResult loadFromRemote(final String remoteSubtitlePath)

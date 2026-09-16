@@ -33,8 +33,11 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.text.Html;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.TextPaint;
 import android.text.TextUtils;
+import android.text.style.ForegroundColorSpan;
 import android.util.AttributeSet;
 import android.view.ViewGroup;
 import android.widget.TextView;
@@ -67,6 +70,7 @@ public class SimpleSubtitleView extends TextView
     public boolean hasInternal = false;
 
     private TextView backGroundText = null;//用于描边的TextView
+    private boolean lyricMode;
 
     public SimpleSubtitleView(final Context context) {
         super(context);
@@ -104,14 +108,32 @@ public class SimpleSubtitleView extends TextView
             setText(EMPTY_TEXT);
             return;
         }
-        String text = subtitle.content;
+        if (lyricMode && subtitle.lines != null) {
+            SpannableStringBuilder builder = new SpannableStringBuilder();
+            for (int i = subtitle.lines.size() - 1; i >= 0; i--) {
+                Subtitle line = subtitle.lines.get(i);
+                if (i > 0) builder.append('\n');
+                int start = builder.length();
+                builder.append(Html.fromHtml(formatText(line.content)));
+                int end = builder.length();
+                builder.setSpan(new ForegroundColorSpan(line.lyricCurrent ? Color.GREEN : Color.YELLOW), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            setText(builder);
+            invalidate();
+            return;
+        }
+        setText(Html.fromHtml(formatText(subtitle.content)));
+    }
+
+    private String formatText(String text) {
+        if (text == null) return EMPTY_TEXT;
         text = text.replaceAll("(?:\\r\\n)", "<br />");
         text = text.replaceAll("(?:\\r)", "<br />");
         text = text.replaceAll("(?:\\n)", "<br />");
         text = text.replaceAll("\\\\N", "<br />");
         text = text.replaceAll("\\{[\\s\\S]*?\\}", "");
         text = text.replaceAll("^.*?,.*?,.*?,.*?,.*?,.*?,.*?,.*?,.*?,", "");
-        setText(Html.fromHtml(text));
+        return text;
     }
 
     @Override
@@ -127,6 +149,16 @@ public class SimpleSubtitleView extends TextView
 
     public void setPlaySubtitleCacheKey(String cacheKey) {
         mSubtitleEngine.setPlaySubtitleCacheKey(cacheKey);
+    }
+
+    public void setMergeSameTime(boolean mergeSameTime) {
+        if (mSubtitleEngine instanceof DefaultSubtitleEngine) {
+            ((DefaultSubtitleEngine) mSubtitleEngine).setMergeSameTime(mergeSameTime);
+        }
+    }
+
+    public void setLyricMode(boolean lyricMode) {
+        this.lyricMode = lyricMode;
     }
 
     public String getPlaySubtitleCacheKey() {
@@ -201,9 +233,10 @@ public class SimpleSubtitleView extends TextView
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         CharSequence tt = backGroundText.getText();
+        CharSequence text = lyricMode ? getText().toString() : getText();
         //两个TextView上的文字必须一致
-        if (TextUtils.isEmpty(tt) || !tt.equals(this.getText())) {
-            backGroundText.setText(getText());
+        if (TextUtils.isEmpty(tt) || !tt.equals(text)) {
+            backGroundText.setText(text);
             this.postInvalidate();
         }
         backGroundText.measure(widthMeasureSpec, heightMeasureSpec);
@@ -219,7 +252,7 @@ public class SimpleSubtitleView extends TextView
     @Override
     protected void onTextChanged(CharSequence text, int start, int lengthBefore, int lengthAfter) {
         if (backGroundText != null) {
-            backGroundText.setText(text);
+            backGroundText.setText(lyricMode && text != null ? text.toString() : text);
         }
         super.onTextChanged(text, start, lengthBefore, lengthAfter);
     }

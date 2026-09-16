@@ -176,7 +176,7 @@
             android:layout_gravity="center"
             android:focusable="false"
             android:focusableInTouchMode="false"
-            android:src="@drawable/icon_play" />
+            android:src="@drawable/exo_icon_play" />
 
         <TextView
             android:id="@+id/tv_pause_progress_text"

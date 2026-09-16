@@ -197,6 +197,8 @@ public class RemoteServer extends NanoHTTPD {
                     return NanoHTTPD.newFixedLengthResponse(NanoHTTPD.Response.Status.OK, NanoHTTPD.MIME_PLAINTEXT, "ok");    
                 } else if (fileName.equals("/action")) {
                     return handleAction(session.getParms());
+                } else if (fileName.equals("/media")) {
+                    return handleMedia();
                 }  else if (fileName.startsWith("/proxyM3u8")) {
 //                    com.github.tvbox.osc.util.LOG.i("echo-proxyM3u8 length:" + (m3u8Content == null ? 0 : m3u8Content.length()));
                     return NanoHTTPD.newFixedLengthResponse(Response.Status.OK, "application/vnd.apple.mpegurl", m3u8Content == null ? "" : m3u8Content);
@@ -341,6 +343,38 @@ public class RemoteServer extends NanoHTTPD {
         if ("danmaku".equals(type)) {
             String path = params.get("path");
             EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_DANMU_REFRESH, path == null ? "" : path));
+        }
+    }
+
+    private Response handleMedia() {
+        try {
+            android.app.Activity activity = App.getInstance().getCurrentActivity();
+            if (activity == null) return createJSONResponse(Response.Status.OK, "{}");
+            final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+            final com.google.gson.JsonObject[] result = new com.google.gson.JsonObject[1];
+            result[0] = new com.google.gson.JsonObject();
+            final android.app.Activity act = activity;
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        if (act instanceof com.github.tvbox.osc.ui.activity.DetailActivity) {
+                            com.github.tvbox.osc.ui.activity.DetailActivity detail = (com.github.tvbox.osc.ui.activity.DetailActivity) act;
+                            com.github.tvbox.osc.ui.fragment.PlayFragment playFragment = detail.getPlayFragment();
+                            if (playFragment != null) result[0] = playFragment.getMediaInfo();
+                        }
+                    } catch (Throwable th) {
+                        LOG.e("echo-media handleMedia error: " + th.getMessage());
+                    } finally {
+                        latch.countDown();
+                    }
+                }
+            });
+            latch.await(2, java.util.concurrent.TimeUnit.SECONDS);
+            return createJSONResponse(Response.Status.OK, result[0].toString());
+        } catch (Throwable th) {
+            LOG.e("echo-media error: " + th.getMessage());
+            return createJSONResponse(Response.Status.OK, "{}");
         }
     }
 

@@ -286,6 +286,10 @@ public class ImgUtil {
         return new GlideUrl(url, builder.build());
     }
 
+    public static Object getImageModel(String url) {
+        return getUrl(url);
+    }
+
     private static boolean isInvalidImageUrl(String url) {
         if (TextUtils.isEmpty(url)) return true;
         url = url.trim();

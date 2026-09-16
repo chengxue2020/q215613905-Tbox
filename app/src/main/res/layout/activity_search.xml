@@ -196,10 +196,10 @@
 
         <GridLayout
             android:id="@+id/historyWordGrid"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/vs_10"
-            android:columnCount="3"
+            android:columnCount="1"
             android:clipChildren="false"
             android:clipToPadding="false" />
     </LinearLayout>

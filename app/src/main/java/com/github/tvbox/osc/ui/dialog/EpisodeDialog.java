@@ -61,6 +61,13 @@ public class EpisodeDialog extends BaseDialog {
         episodeList.setLayoutManager(layoutManager);
         episodeList.setAdapter(adapter);
         adapter.setNewData(episodes);
+        int initialGridWidth = getContext().getResources().getDisplayMetrics().widthPixels / 2
+                - getContext().getResources().getDimensionPixelSize(R.dimen.vs_30) * 2;
+        if (initialGridWidth > 0) {
+            layoutManager.setSpanCount(getSpanCount(initialGridWidth));
+            scrollToSelectedPosition(layoutManager);
+            episodeList.setSelectedPosition(selectedPosition);
+        }
         adapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
             @Override
             public void onItemClick(BaseQuickAdapter adapter, View view, int position) {
@@ -72,12 +79,43 @@ public class EpisodeDialog extends BaseDialog {
         episodeList.post(new Runnable() {
             @Override
             public void run() {
-                layoutManager.setSpanCount(getSpanCount(episodeList.getWidth()));
+                if (episodeList.getWidth() <= 0) {
+                    episodeList.postDelayed(this, 50);
+                    return;
+                }
+                int spanCount = getSpanCount(episodeList.getWidth());
+                if (layoutManager.getSpanCount() != spanCount) {
+                    layoutManager.setSpanCount(spanCount);
+                    scrollToSelectedPosition(layoutManager);
+                }
                 episodeList.setSelectedPosition(selectedPosition);
-                episodeList.setSelectionWithSmooth(selectedPosition);
-                episodeList.requestFocus();
+                requestSelectedEpisodeFocus(episodeList, layoutManager, 0);
             }
         });
+    }
+
+    private void scrollToSelectedPosition(V7GridLayoutManager layoutManager) {
+        // 当前集上方预留两排，避免贴在顶部时遥控上键找不到可移动的焦点项。
+        int rowsBeforeSelected = 2;
+        int startPosition = Math.max(0, selectedPosition - layoutManager.getSpanCount() * rowsBeforeSelected);
+        layoutManager.scrollToPositionWithOffset(startPosition, 0);
+    }
+
+    private void requestSelectedEpisodeFocus(final TvRecyclerView episodeList,
+                                             final V7GridLayoutManager layoutManager,
+                                             final int retryCount) {
+        episodeList.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                View selectedView = layoutManager.findViewByPosition(selectedPosition);
+                if (selectedView != null) {
+                    selectedView.requestFocus();
+                } else if (retryCount < 3) {
+                    scrollToSelectedPosition(layoutManager);
+                    requestSelectedEpisodeFocus(episodeList, layoutManager, retryCount + 1);
+                }
+            }
+        }, 50);
     }
 
     private int getSpanCount(int gridWidth) {

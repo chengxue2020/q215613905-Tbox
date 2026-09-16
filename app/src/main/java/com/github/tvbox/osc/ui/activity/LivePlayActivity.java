@@ -129,6 +129,7 @@ public class LivePlayActivity extends BaseActivity {
     private TextView tvChannelInfo;
     private TextView tvTime;
     private TextView tvNetSpeed;
+    private View tvTopStatus;
     private TextView tvResolution;
     private LinearLayout tvLeftChannelListLayout;
     private TvRecyclerView mChannelGroupView;
@@ -274,6 +275,7 @@ public class LivePlayActivity extends BaseActivity {
         tvChannelInfo = findViewById(R.id.tvChannel);
         tvTime = findViewById(R.id.tvTime);
         tvNetSpeed = findViewById(R.id.tvNetSpeed);
+        tvTopStatus = findViewById(R.id.tv_top_status);
         tvResolution = findViewById(R.id.tvResolution);
 
         //EPG  findViewById  by 龍
@@ -1031,6 +1033,7 @@ public class LivePlayActivity extends BaseActivity {
             }
             if(!tip_epg1.getText().equals("暂无信息")){
                 ll_right_top_loading.setVisibility(View.VISIBLE);
+                updateTopStatusVisibility();
                 ll_epg.setVisibility(View.VISIBLE);
                 countDownTimer = new CountDownTimer(postTimeout, 1000) {//底部epg隐藏时间设定
                     public void onTick(long j) {
@@ -1039,6 +1042,7 @@ public class LivePlayActivity extends BaseActivity {
                         ll_right_top_loading.setVisibility(View.GONE);
                         ll_right_top_huikan.setVisibility(View.GONE);
                         ll_epg.setVisibility(View.GONE);
+                        updateTopStatusVisibility();
                     }
                 };
                 countDownTimer.start();
@@ -1046,6 +1050,7 @@ public class LivePlayActivity extends BaseActivity {
                 ll_right_top_loading.setVisibility(View.GONE);
                 ll_right_top_huikan.setVisibility(View.GONE);
                 ll_epg.setVisibility(View.GONE);
+                updateTopStatusVisibility();
             }
             if (channel_Name == null || channel_Name.getSourceNum() <= 0) {
                 ((TextView) findViewById(R.id.tv_source)).setText("1/1");
@@ -1826,7 +1831,7 @@ public class LivePlayActivity extends BaseActivity {
         if(mVideoView!=null){
             if(liveChannelHeader()!=null)LOG.i("echo-"+liveChannelHeader().toString());
             boolean reusePlayer = canReusePlayer(previousLivePlayerType);
-            boolean keepExoFrame = reusePlayer && previousLivePlayerType == 3;
+            boolean keepExoFrame = reusePlayer && previousLivePlayerType == 2;
             if (showPreviousFrame && !keepExoFrame) {
                 showSwitchChannelSnapshot();
             } else {
@@ -1942,6 +1947,7 @@ public class LivePlayActivity extends BaseActivity {
                 if (holder != null)
                     holder.itemView.requestFocus();
                 tvRightSettingLayout.setVisibility(View.VISIBLE);
+                updateTopStatusVisibility();
                 ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) tvRightSettingLayout.getLayoutParams();
                 if (tvRightSettingLayout.getVisibility() == View.VISIBLE) {
                     ViewObj viewObj = new ViewObj(tvRightSettingLayout, params);
@@ -1973,6 +1979,7 @@ public class LivePlayActivity extends BaseActivity {
                     public void onAnimationEnd(Animator animation) {
                         super.onAnimationEnd(animation);
                         tvRightSettingLayout.setVisibility(View.INVISIBLE);
+                        updateTopStatusVisibility();
                         liveSettingGroupAdapter.setSelectedGroupIndex(-1);
                     }
                 });
@@ -3045,6 +3052,7 @@ public class LivePlayActivity extends BaseActivity {
         showNetSpeed();
         tvLeftChannelListLayout.setVisibility(View.INVISIBLE);
         tvRightSettingLayout.setVisibility(View.INVISIBLE);
+        updateTopStatusVisibility();
 
         liveChannelGroupAdapter.clearGroupState();
         liveChannelGroupAdapter.setNewData(new ArrayList<>(liveChannelGroupList));
@@ -3183,7 +3191,7 @@ public class LivePlayActivity extends BaseActivity {
     }
 
     void showTime() {
-        if (Hawk.get(HawkConfig.LIVE_SHOW_TIME, false)) {
+        if (Hawk.get(HawkConfig.LIVE_SHOW_TIME, false) && !isTopStatusObstructed()) {
             mHandler.post(mUpdateTimeRun);
             tvTime.setVisibility(View.VISIBLE);
         } else {
@@ -3205,11 +3213,28 @@ public class LivePlayActivity extends BaseActivity {
     private void showNetSpeed() {
 //        tv_right_top_tipnetspeed.setVisibility(View.VISIBLE);
         mHandler.removeCallbacks(mUpdateNetSpeedRun);
-        if (Hawk.get(HawkConfig.LIVE_SHOW_NET_SPEED, false)) {
+        if (Hawk.get(HawkConfig.LIVE_SHOW_NET_SPEED, false) && !isTopStatusObstructed()) {
             mHandler.post(mUpdateNetSpeedRun);
             tvNetSpeed.setVisibility(View.VISIBLE);
         } else {
             tvNetSpeed.setVisibility(View.GONE);
+        }
+    }
+
+    private boolean isTopStatusObstructed() {
+        return (tvRightSettingLayout != null && tvRightSettingLayout.getVisibility() == View.VISIBLE)
+                || (ll_right_top_loading != null && ll_right_top_loading.getVisibility() == View.VISIBLE)
+                || (ll_right_top_huikan != null && ll_right_top_huikan.getVisibility() == View.VISIBLE);
+    }
+
+    private void updateTopStatusVisibility() {
+        if (isTopStatusObstructed()) {
+            tvTopStatus.setVisibility(View.GONE);
+        } else {
+            showTime();
+            showNetSpeed();
+            tvTopStatus.setVisibility(tvTime.getVisibility() == View.VISIBLE
+                    || tvNetSpeed.getVisibility() == View.VISIBLE ? View.VISIBLE : View.GONE);
         }
     }
 
@@ -3433,11 +3458,13 @@ public class LivePlayActivity extends BaseActivity {
         sBar.requestFocus();
         if(show){
             ll_right_top_huikan.setVisibility(View.VISIBLE);
+            updateTopStatusVisibility();
             backcontroller.setVisibility(View.VISIBLE);
             ll_epg.setVisibility(View.GONE);
         }else{
             backcontroller.setVisibility(View.GONE);
             ll_right_top_huikan.setVisibility(View.GONE);
+            updateTopStatusVisibility();
             if(!tip_epg1.getText().equals("暂无信息")){
                 ll_epg.setVisibility(View.VISIBLE);
             }

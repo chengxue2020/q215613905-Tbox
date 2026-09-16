@@ -137,6 +137,9 @@ public final class ExoMediaSourceHelper {
     }
 
     private boolean isHlsUri(String uri) {
+        if (isAudioUri(uri)) {
+            return false;
+        }
         if (uri.contains("m3u8") || uri.contains("type=hls") || uri.contains("format=hls")) {
             return true;
         }
@@ -147,6 +150,23 @@ public final class ExoMediaSourceHelper {
         }
         path = path.toLowerCase();
         return path.endsWith("/live.php") || path.contains("/live/");
+    }
+
+    private boolean isAudioUri(String uri) {
+        Uri parsedUri = Uri.parse(uri);
+        String path = parsedUri.getPath();
+        if (path == null) {
+            path = uri;
+        }
+        path = path.toLowerCase();
+        return path.endsWith(".mp3")
+                || path.endsWith(".m4a")
+                || path.endsWith(".aac")
+                || path.endsWith(".flac")
+                || path.endsWith(".wav")
+                || path.endsWith(".ogg")
+                || path.endsWith(".opus")
+                || path.endsWith(".amr");
     }
 
     private DataSource.Factory getCacheDataSourceFactory() {

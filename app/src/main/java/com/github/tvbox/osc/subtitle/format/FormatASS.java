@@ -483,6 +483,7 @@ public class FormatASS implements TimedTextFileFormat {
 		for (int i = 0; i < dialogueFormat.length; i++) {
 			//we go through every format parameter and save the interesting values
 			if (dialogueFormat[i].trim().equalsIgnoreCase("Style")){
+				newCaption.lyricCurrent = "PLAYING_CENTER".equals(line[i].trim());
 				//we save the style
 				Style s =  tto.styling.get(line[i].trim());
 				if (s!=null)

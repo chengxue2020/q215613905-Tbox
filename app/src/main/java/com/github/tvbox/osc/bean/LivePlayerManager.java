@@ -19,6 +19,9 @@ public class LivePlayerManager {
     public void init(VideoView videoView) {
         try {
             defaultPlayerConfig.put("pl", Hawk.get(HawkConfig.LIVE_PLAY_TYPE, Hawk.get(HawkConfig.PLAY_TYPE, 2)));
+            if (defaultPlayerConfig.optInt("pl", 2) == 0) {
+                defaultPlayerConfig.put("pl", 2);
+            }
             defaultPlayerConfig.put("ijk", Hawk.get(HawkConfig.IJK_CODEC, "硬解码"));
             defaultPlayerConfig.put("pr", Hawk.get(HawkConfig.PLAY_RENDER, 0));
             defaultPlayerConfig.put("sc", Hawk.get(HawkConfig.LIVE_PLAY_SCALE, 0));
@@ -38,22 +41,19 @@ public class LivePlayerManager {
     }
 
     public int getLivePlayerType() {
-        int playerTypeIndex = 0;
+        int playerTypeIndex = 2;
         try {
             int playerType = currentPlayerConfig.getInt("pl");
             String ijkCodec = currentPlayerConfig.getString("ijk");
             switch (playerType) {
-                case 0:
-                    playerTypeIndex = 0;
-                    break;
                 case 1:
                     if (ijkCodec.equals("硬解码"))
-                        playerTypeIndex = 1;
+                        playerTypeIndex = 0;
                     else
-                        playerTypeIndex = 2;
+                        playerTypeIndex = 1;
                     break;
                 case 2:
-                    playerTypeIndex = 3;
+                    playerTypeIndex = 2;
                     break;
             }
         } catch (JSONException e) {
@@ -76,18 +76,14 @@ public class LivePlayerManager {
         try {
             switch (playerType) {
                 case 0:
-                    playerConfig.put("pl", 0);
-                    playerConfig.put("ijk", "软解码");
-                    break;
-                case 1:
                     playerConfig.put("pl", 1);
                     playerConfig.put("ijk", "硬解码");
                     break;
-                case 2:
+                case 1:
                     playerConfig.put("pl", 1);
                     playerConfig.put("ijk", "软解码");
                     break;
-                case 3:
+                case 2:
                     playerConfig.put("pl", 2);
                     playerConfig.put("ijk", "软解码");
                     break;

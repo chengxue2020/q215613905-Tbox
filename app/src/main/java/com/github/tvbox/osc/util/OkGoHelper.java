@@ -52,7 +52,7 @@ import xyz.doikki.videoplayer.exo.ExoMediaSourceHelper;
 
 
 public class OkGoHelper {
-    public static final long DEFAULT_MILLISECONDS = 10000;      //默认的超时时间
+    public static final long DEFAULT_MILLISECONDS = 20000;      //默认的超时时间
 
     // 内置doh json
     private static final String dnsConfigJson = "["

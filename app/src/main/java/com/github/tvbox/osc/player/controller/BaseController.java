@@ -33,7 +33,7 @@ public abstract class BaseController extends BaseVideoController implements Gest
     private boolean mIsGestureEnabled = true;
     private int mStreamVolume;
     private float mBrightness;
-    private int mSeekPosition;
+    private int mSeekPosition = -1;
     private boolean mFirstTouch;
     private boolean mChangePosition;
     private boolean mChangeBrightness;
@@ -178,6 +178,12 @@ public abstract class BaseController extends BaseVideoController implements Gest
     public void hidePauseRoot() {
         if (mPauseRoot != null) {
             mPauseRoot.setVisibility(GONE);
+        }
+    }
+
+    public void showPauseRoot() {
+        if (mPauseRoot != null) {
+            mPauseRoot.setVisibility(VISIBLE);
         }
     }
 
@@ -390,14 +396,14 @@ public abstract class BaseController extends BaseVideoController implements Gest
             switch (action) {
                 case MotionEvent.ACTION_UP:
                     stopSlide();
-                    if (mSeekPosition > 0) {
+                    if (mSeekPosition >= 0) {
                         mControlWrapper.seekTo(mSeekPosition);
-                        mSeekPosition = 0;
+                        mSeekPosition = -1;
                     }
                     break;
                 case MotionEvent.ACTION_CANCEL:
                     stopSlide();
-                    mSeekPosition = 0;
+                    mSeekPosition = -1;
                     break;
             }
         }

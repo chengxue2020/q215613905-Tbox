@@ -238,6 +238,16 @@ public class IjkPlayer extends AbstractPlayer implements IMediaPlayer.OnErrorLis
 
     @Override
     public void onPrepared(IMediaPlayer mp) {
+        long startPosition = getStartPosition();
+        if (startPosition > 0) {
+            try {
+                mMediaPlayer.seekTo(PlayerUtils.safeTimeMs(startPosition));
+            } catch (IllegalStateException e) {
+                mPlayerEventListener.onError();
+                return;
+            }
+        }
+        markStartPositionApplied();
         mPlayerEventListener.onPrepared();
         // 修复播放纯音频时状态出错问题
         if (!isVideo()) {
